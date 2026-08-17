@@ -1,0 +1,3525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevKit · 开发者工具箱</title>
+  <meta name="description" content="日常开发常用工具集合：JSON 格式化、Base64、加密、时间戳、二维码等" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='28'%3E🧰%3C/text%3E%3C/svg%3E" />
+  <!-- CDN 库 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="postcode-data.js"></script>
+  <style>
+    /* ===== 基础变量 ===== */
+    :root {
+      --bg: #f6f7f9;
+      --bg-card: #ffffff;
+      --bg-soft: #f0f2f5;
+      --bg-hover: #ebedf0;
+      --border: #e4e7eb;
+      --text: #1f2329;
+      --text-soft: #4e5969;
+      --text-mute: #86909c;
+      --primary: #165dff;
+      --primary-soft: #e8f3ff;
+      --primary-hover: #0e42d2;
+      --success: #00b42a;
+      --success-soft: #e8ffea;
+      --warning: #ff7d00;
+      --warning-soft: #fff7e8;
+      --danger: #f53f3f;
+      --danger-soft: #ffece8;
+      --code-bg: #f7f8fa;
+      --shadow: 0 2px 8px rgba(0,0,0,0.06);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+      --radius: 8px;
+      --radius-sm: 6px;
+      --radius-lg: 12px;
+      --sidebar-w: 240px;
+      --header-h: 60px;
+    }
+    [data-theme="dark"] {
+      --bg: #17171a;
+      --bg-card: #1f1f23;
+      --bg-soft: #25252a;
+      --bg-hover: #2a2a30;
+      --border: #2e2e35;
+      --text: #e8e8e8;
+      --text-soft: #b8b8be;
+      --text-mute: #7a7a82;
+      --primary: #4080ff;
+      --primary-soft: #1a2d4a;
+      --primary-hover: #5a96ff;
+      --success: #23c343;
+      --success-soft: #1a2e1f;
+      --warning: #ff9a2e;
+      --warning-soft: #2e251a;
+      --danger: #f76560;
+      --danger-soft: #2e1a1a;
+      --code-bg: #161619;
+      --shadow: 0 2px 8px rgba(0,0,0,0.3);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    /* ===== Reset ===== */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; }
+    button { cursor: pointer; border: none; background: none; }
+    a { color: var(--primary); text-decoration: none; }
+
+    /* ===== 布局 ===== */
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      grid-template-rows: var(--header-h) 1fr;
+      grid-template-areas: "logo header" "sidebar main";
+      height: 100vh;
+    }
+    .logo-area {
+      grid-area: logo;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      font-weight: 700; font-size: 16px;
+    }
+    .logo-area .logo-mark {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: linear-gradient(135deg, #165dff, #4080ff);
+      color: #fff; display: grid; place-items: center;
+      font-size: 14px; font-weight: 800;
+    }
+    .header {
+      grid-area: header;
+      display: flex; align-items: center; gap: 12px;
+      padding: 0 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: nowrap;
+      min-width: 0;
+    }
+    .header > * { flex-shrink: 0; }
+    .header > .search-box { flex: 1 1 0; }
+    .search-box {
+      position: relative;
+      max-width: 480px;
+    }
+    .search-box input {
+      width: 100%; height: 36px;
+      padding: 0 36px 0 12px;
+      background: var(--bg-soft);
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      outline: none; transition: 0.15s;
+    }
+    .search-box input:focus { border-color: var(--primary); background: var(--bg-card); }
+    .search-box::before {
+      content: "🔍"; position: absolute; right: 12px; top: 50%;
+      transform: translateY(-50%); font-size: 14px; opacity: 0.6;
+    }
+    .header-actions { display: flex; gap: 8px; margin-left: auto; }
+    .home-clock {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 3px;
+      user-select: none; flex-shrink: 0;
+      margin-left: 16px;
+    }
+    .home-clock .hc-row {
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .home-clock #clockDisplay {
+      font-size: 22px; font-weight: 700; color: var(--text);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+    }
+    .home-clock .date {
+      font-size: 13px; color: var(--text-mute);
+      font-variant-numeric: tabular-nums;
+    }
+    .home-clock .ts {
+      font-size: 12px; color: var(--primary);
+      font-variant-numeric: tabular-nums;
+      cursor: pointer; transition: 0.12s;
+      opacity: 0.7;
+    }
+    .home-clock .ts:hover { opacity: 1; text-decoration: underline; }
+    .icon-btn {
+      width: 36px; height: 36px; border-radius: var(--radius-sm);
+      display: grid; place-items: center;
+      background: var(--bg-soft); transition: 0.15s;
+      font-size: 16px;
+    }
+    .icon-btn:hover { background: var(--bg-hover); }
+
+    .sidebar {
+      grid-area: sidebar;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+    .nav-group { padding: 8px 0; }
+    .nav-group-title {
+      padding: 6px 20px;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 20px;
+      color: var(--text-soft);
+      cursor: pointer; transition: 0.12s;
+      border-left: 3px solid transparent;
+      font-size: 13px;
+    }
+    .nav-item:hover { background: var(--bg-soft); color: var(--text); }
+    .nav-item.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-left-color: var(--primary);
+      font-weight: 500;
+    }
+    .nav-item .icon { width: 18px; text-align: center; font-size: 14px; }
+    .nav-item.search-highlight { background: #fff8e6; }
+    [data-theme="dark"] .nav-item.search-highlight { background: #3a3020; }
+
+    .main {
+      grid-area: main;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .tool-page { display: none; max-width: 1100px; margin: 0 auto; }
+    .tool-page.active { display: block; }
+    .tool-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .tool-title { font-size: 20px; font-weight: 700; }
+    .tool-desc { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
+
+    /* ===== 组件 ===== */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-soft);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-size: 13px; font-weight: 500;
+      transition: 0.15s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:hover { background: var(--bg-hover); }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn.primary:hover { background: var(--primary-hover); }
+    .btn.success { background: var(--success); color: #fff; border-color: var(--success); }
+    .btn.ghost { background: transparent; border-color: transparent; }
+    .btn.ghost:hover { background: var(--bg-soft); }
+    .btn.sm { padding: 5px 10px; font-size: 12px; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .field { margin-bottom: 14px; }
+    .field-label {
+      display: block; margin-bottom: 6px;
+      font-size: 12px; color: var(--text-soft); font-weight: 500;
+    }
+    .input, .textarea, .select {
+      width: 100%;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      outline: none; transition: 0.15s;
+      color: var(--text);
+    }
+    .input:focus, .textarea:focus, .select:focus {
+      border-color: var(--primary);
+      background: var(--bg-card);
+    }
+    .textarea {
+      font-family: "SF Mono", "Monaco", "Consolas", monospace;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 160px;
+      line-height: 1.5;
+    }
+    .textarea.lg { min-height: 280px; }
+    .textarea.sm { min-height: 100px; }
+    .textarea.gen { min-height: 120px; max-height: 300px; }
+
+    .row { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+
+    .toast {
+      position: fixed; top: 80px; left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--text); color: var(--bg-card);
+      padding: 10px 24px; border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      transition: 0.3s; opacity: 0; z-index: 1000;
+      font-size: 13px;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.success { background: var(--success); color: #fff; }
+    .toast.error { background: var(--danger); color: #fff; }
+
+    .output-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-family: "SF Mono", "Monaco", "Consolas", monospace;
+      font-size: 13px;
+      white-space: pre-wrap; word-break: break-all;
+      min-height: 60px;
+      max-height: 400px; overflow: auto;
+    }
+    .output-box.error { color: var(--danger); }
+    .output-box.empty { color: var(--text-mute); font-style: italic; }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 500;
+      background: var(--bg-soft); color: var(--text-soft);
+    }
+    .tag.success { background: var(--success-soft); color: var(--success); }
+    .tag.danger { background: var(--danger-soft); color: var(--danger); }
+
+    .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table th, .table td {
+      padding: 10px 12px; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .table th { color: var(--text-soft); font-weight: 600; font-size: 12px; }
+    .table td.mono { font-family: monospace; }
+
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .checkbox-row input { width: 16px; height: 16px; }
+
+    .hint {
+      padding: 10px 12px;
+      background: var(--primary-soft);
+      border-radius: var(--radius-sm);
+      font-size: 12px; color: var(--text-soft);
+      margin-bottom: 12px;
+    }
+    .hint.warning { background: var(--warning-soft); }
+    .hint.danger { background: var(--danger-soft); }
+
+    .color-preview {
+      width: 40px; height: 40px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .qrcode-box {
+      display: grid; place-items: center;
+      padding: 20px; min-height: 200px;
+    }
+    .qrcode-box img, .qrcode-box canvas { border-radius: var(--radius-sm); }
+
+    .copy-btn {
+      position: absolute; top: 8px; right: 8px;
+      padding: 6px 16px; font-size: 13px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); transition: 0.15s;
+      font-weight: 500; cursor: pointer; opacity: 1;
+    }
+    .textarea-wrap { position: relative; }
+    .textarea-wrap .copy-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* 滚动条 */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-mute); }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* 移动端 */
+    @media (max-width: 768px) {
+      /* ===== 布局 ===== */
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 52px 1fr;
+        grid-template-areas: "header" "main";
+      }
+      .logo-area { display: none; }
+
+      /* ===== Header ===== */
+      .header { padding: 0 12px; gap: 8px; }
+      #menuBtn { display: flex !important; }
+      .search-box { flex: 1; max-width: none; }
+      .search-box input { font-size: 15px; } /* 防止 iOS 缩放 */
+      .header-actions { gap: 4px; }
+
+      /* ===== Sidebar 移动端弹出层 ===== */
+      .sidebar {
+        display: flex; flex-direction: column;
+        position: fixed; top: 52px; left: 0; bottom: 0; z-index: 500;
+        width: 260px; max-width: 80vw;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: var(--shadow-lg);
+        border-right: 1px solid var(--border);
+      }
+      .sidebar.open { transform: translateX(0); }
+      /* 遮罩 */
+      .sidebar-backdrop {
+        display: none;
+        position: fixed; top: 52px; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.35); z-index: 499;
+      }
+      .sidebar-backdrop.show { display: block; }
+
+      /* ===== Main ===== */
+      .main { padding: 16px 12px; }
+
+      /* ===== Row & Card ===== */
+      .row { flex-direction: column; }
+      .card { padding: 14px; border-radius: var(--radius); }
+      .home-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+      .wt-city-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+      .wt-city { padding: 10px; }
+      .wt-city-time { font-size: 18px; }
+      .home-card { padding: 14px; }
+      .tool-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .home-clock { margin-left: 0; margin-top: 4px; }
+        /* ===== 表格 ===== */
+      .table { font-size: 12px; }
+      .table th, .table td { padding: 8px 10px; }
+
+      /* ===== 按钮 ===== */
+      .btn { padding: 6px 12px; font-size: 12px; }
+      .btn.sm { padding: 4px 8px; font-size: 11px; }
+      .btn-group { gap: 6px; }
+      .icon-btn { width: 32px; height: 32px; font-size: 14px; }
+
+      /* ===== 输入框 ===== */
+      .input, .select { font-size: 15px; padding: 8px 10px; }
+
+      /* ===== Toast ===== */
+      .toast { top: 60px; left: 16px; right: 16px; transform: translateY(-20px); font-size: 12px; padding: 8px 16px; text-align: center; }
+      .toast.show { transform: translateX(0) translateY(0); }
+
+      /* ===== 邮编结果卡片 ===== */
+      #pcReverseResultList > div, #pcForwardResultList > div {
+        flex-direction: column; align-items: flex-start; gap: 8px;
+        padding: 12px 14px;
+      }
+      #pcReverseResultList > div > div:last-child,
+      #pcForwardResultList > div > div:last-child {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+      }
+    }
+
+    /* 平板端 769-1024 */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .app { grid-template-columns: 200px 1fr; }
+      .home-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    }
+
+    /* 首页 */
+    .home-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .home-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      cursor: pointer;
+      transition: 0.18s;
+      box-shadow: var(--shadow);
+    }
+    .home-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary);
+    }
+    .home-card .icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--primary-soft); color: var(--primary);
+      display: grid; place-items: center; font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .home-card .title { font-weight: 600; margin-bottom: 4px; }
+    .home-card .desc { font-size: 12px; color: var(--text-mute); }
+
+    /* 世界时间城市卡片 */
+    .wt-city-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .wt-city {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .wt-city-head {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 8px;
+    }
+    .wt-city-time {
+      font-size: 22px; font-weight: 700;
+      font-variant-numeric: tabular-nums; letter-spacing: 1.5px;
+      margin-bottom: 2px;
+    }
+    .wt-city-date {
+      font-size: 12px; color: var(--text-mute);
+    }
+
+    .footer {
+      text-align: center; padding: 20px 0 16px;
+      color: var(--text-mute); font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+
+    /* ===== Language Select ===== */
+    .lang-select {
+      padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg-soft); color: var(--text); font-size: 13px;
+      cursor: pointer; outline: none;
+    }
+    .lang-select:hover { border-color: var(--primary); }
+    .lang-select option { background: var(--bg-card); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Logo 区 -->
+    <div class="logo-area">
+      <div class="logo-mark">D</div>
+      <span>DevKit</span>
+    </div>
+
+    <!-- 顶栏 -->
+    <header class="header">
+      <button class="icon-btn" id="menuBtn" title="菜单" style="display:none;">📋</button>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索工具（如 JSON、Base64、MD5）..." autocomplete="off" />
+      </div>
+      <div class="header-actions">
+        <select class="lang-select" id="langBtn" title="Language / 语言">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+        <button class="icon-btn" id="themeBtn" title="切换主题">🌙</button>
+        <a class="icon-btn" href="#home" title="首页" style="text-decoration:none;">🏠</a>
+      </div>
+    </header>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <!-- 主区 -->
+    <main class="main" id="main"></main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    /* =========================================================
+       DevKit · 开发者工具箱  纯静态实现
+       ========================================================= */
+
+    /* ---------- 工具函数 ---------- */
+    const $ = (sel, p = document) => p.querySelector(sel);
+    const $$ = (sel, p = document) => Array.from(p.querySelectorAll(sel));
+
+    function toast(msg, type = '') {
+      if (lang === 'en' && I18N[msg]) msg = I18N[msg];
+      const t = $('#toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + type;
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.className = 'toast', 1800);
+    }
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(
+        () => toast('已复制', 'success'),
+        () => toast('复制失败', 'error')
+      );
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    /* ---------- i18n 国际化 ---------- */
+    let lang = localStorage.getItem('devkit-lang') || 'zh';
+    const I18N = {
+      /* Groups */
+      '首页': 'Home', '编码解码': 'Encoding', '证件工具': 'ID & License',
+      '加密哈希': 'Crypto', '文本工具': 'Text Tools', '其他工具': 'Others',
+      '常用': 'Common',
+      /* Tool names */
+      'JSON 格式化': 'JSON Formatter', 'JSON ↔ YAML': 'JSON ↔ YAML',
+      'Base64': 'Base64', 'URL 编码': 'URL Encode', 'HTML 转义': 'HTML Escape',
+      'Unicode 转换': 'Unicode Convert', '图片 ↔ Base64': 'Image ↔ Base64',
+      '身份证号': 'ID Card Number', '营业执照号': 'Business License',
+      '邮政编码': 'Postal Code', 'MD5/SHA 哈希': 'MD5/SHA Hash',
+      'AES 加解密': 'AES Encrypt/Decrypt', 'UUID 生成': 'UUID Generator',
+      '时间戳': 'Timestamp', '世界时间': 'World Clock',
+      '正则测试': 'Regex Tester', '密码生成器': 'Password Generator',
+      '文本对比': 'Text Diff', '文本去重排序': 'Text Dedupe & Sort',
+      'Cron 解析': 'Cron Parser', '二维码生成': 'QR Code Generator',
+      '颜色转换': 'Color Converter', 'JWT 解析': 'JWT Decoder',
+      '进制转换': 'Radix Converter', 'IP 子网计算': 'IP Subnet Calc',
+      'SQL 格式化': 'SQL Formatter', '二维码识别': 'QR Code Reader',
+      /* Tool descriptions */
+      '格式化、压缩、校验 JSON 数据': 'Format, minify, validate JSON',
+      'JSON 与 YAML 双向转换': 'Convert between JSON and YAML',
+      'Base64 编码与解码': 'Base64 encode and decode',
+      'URL 编码与解码': 'URL encode and decode',
+      'HTML 实体转义与反转义': 'HTML entity escape and unescape',
+      '中文与 Unicode 互转': 'Convert between Chinese and Unicode',
+      '图片转 Base64 / Base64 预览图片': 'Image to Base64 / Base64 to image',
+      '身份证号校验、解析（性别/生日/地区）': 'ID card number validation and parsing',
+      '统一社会信用代码 / 营业执照注册号校验解析': 'USCC / Business License validation',
+      '省市区 ↔ 邮编 互查': 'Province/city/district <-> postal code',
+      'MD5、SHA1、SHA256、SHA512 哈希计算': 'MD5, SHA1, SHA256, SHA512 hash',
+      'AES 对称加密与解密': 'AES symmetric encryption and decryption',
+      '批量生成 UUID/GUID': 'Batch generate UUID/GUID',
+      '时间戳与日期互转': 'Convert between timestamp and date',
+      '全球实时时间、时区查询': 'World time and timezone query',
+      '正则表达式匹配测试': 'Regex match testing',
+      '自定义规则批量生成随机密码': 'Generate random passwords with custom rules',
+      '逐行对比两段文本差异': 'Line-by-line text diff comparison',
+      '按行去重、排序、统计': 'Dedupe, sort, count by line',
+      'Cron 表达式翻译 + 下次执行时间': 'Cron expression parser with next runs',
+      '生成二维码图片': 'Generate QR code image',
+      'RGB / HEX / HSL 互转': 'RGB / HEX / HSL conversion',
+      '解析 JWT Token 三段内容': 'Parse JWT token (header/payload/signature)',
+      '二进制/八进制/十进制/十六进制互转': 'Binary/Octal/Decimal/Hex conversion',
+      'CIDR/掩码互转、网络/广播地址、同网段判断': 'CIDR/subnet mask, network/broadcast, same-subnet check',
+      'SQL 关键字大写、换行缩进': 'SQL keyword casing and formatting',
+      '上传图片识别二维码内容': 'Upload image to decode QR code',
+      /* Home page */
+      '🧰 开发者工具箱': '🧰 Developer Toolkit',
+      '日常开发常用工具集合 · 纯前端运行 · 数据不出本地': 'Common dev tools - Pure frontend - Data stays local',
+      'DevKit · 纯静态实现': 'DevKit - Static Implementation',
+      '所有计算均在浏览器本地完成，数据不会上传': 'All calculations run locally in your browser. No data is uploaded.',
+      /* Common buttons */
+      '格式化': 'Format', '压缩': 'Minify', '校验': 'Validate',
+      '转义': 'Escape', '反转义': 'Unescape',
+      '编码': 'Encode', '解码': 'Decode',
+      '加密': 'Encrypt', '解密': 'Decrypt',
+      '转换': 'Convert', '生成': 'Generate',
+      '查询': 'Search', '解析': 'Parse',
+      '计算': 'Calculate', '处理': 'Process',
+      '预览': 'Preview', '下载图片': 'Download',
+      '判断': 'Check', '测试匹配': 'Test Match',
+      '替换匹配': 'Replace', '对比差异': 'Compare',
+      '交换': 'Swap', '刷新': 'Refresh',
+      '复制': 'Copy', '复制全部': 'Copy All',
+      '清空': 'Clear', '清空结果': 'Clear Results',
+      '生成 UUID': 'Generate UUID', '生成密码': 'Generate Password',
+      '生成二维码': 'Generate QR Code', '预览图片': 'Preview Image',
+      '转换 →': 'Convert →', '编码 →': 'Encode →', '← 解码': '← Decode',
+      '加密 →': 'Encrypt →', '← 解密': '← Decrypt',
+      '转义 →': 'Escape →', '← 反转义': '← Unescape',
+      '🎲 生成': '🎲 Generate', '🎲 生成密码': '🎲 Generate Password',
+      '⚖️ 对比差异': '⚖️ Compare', '⇄ 交换': '⇄ Swap',
+      '🔄 刷新': '🔄 Refresh',
+      /* Common labels */
+      '输出结果': 'Output', '格式化结果': 'Formatted Result',
+      '输入文本': 'Input Text', '输入 JSON': 'Input JSON',
+      '输入 SQL': 'Input SQL', '输入': 'Input',
+      '输入文本（每行一条）': 'Input Text (one per line)',
+      '测试文本': 'Test Text', '原始文本': 'Original Text',
+      '修改后文本': 'Modified Text', '对比结果': 'Diff Results',
+      '替换结果': 'Replace Result', '识别结果': 'Decode Result',
+      '生成结果': 'Generated Results', '查询结果': 'Search Results',
+      '转换结果': 'Conversion Results', '解析结果': 'Parse Results',
+      '二维码预览': 'QR Code Preview',
+      '结果将显示在这里': 'Results will appear here',
+      '处理结果将显示在这里': 'Processed results will appear here',
+      '转换结果将显示在这里': 'Converted results will appear here',
+      '生成的 UUID 列表将显示在这里': 'Generated UUIDs will appear here',
+      '生成的密码将显示在这里': 'Generated passwords will appear here',
+      '生成的身份证号码将显示在这里': 'Generated ID numbers will appear here',
+      '生成的号码将显示在这里': 'Generated numbers will appear here',
+      '哈希值将显示在这里': 'Hash value will appear here',
+      '格式化后的 SQL 将显示在这里': 'Formatted SQL will appear here',
+      '识别内容将显示在这里': 'Decoded content will appear here',
+      '（输出结果将显示在这里）': '(Results will appear here)',
+      /* Common toast messages */
+      '已复制': 'Copied', '复制失败': 'Copy failed',
+      '格式化成功': 'Formatted successfully',
+      '压缩成功': 'Minified successfully',
+      '已转义': 'Escaped', '已反转义': 'Unescaped',
+      '编码成功': 'Encoded successfully',
+      '解码成功': 'Decoded successfully',
+      '加密成功': 'Encrypted successfully',
+      '解密成功': 'Decrypted successfully',
+      '已转换': 'Converted', '转换成功': 'Converted successfully',
+      '已生成': 'Generated', '生成失败': 'Generation failed',
+      '解析成功': 'Parsed successfully', '解析失败': 'Parse failed',
+      '计算完成': 'Calculation complete', '计算失败': 'Calculation failed',
+      '处理完成': 'Processing complete', '处理失败': 'Processing failed',
+      '对比完成': 'Comparison complete', '替换完成': 'Replace complete',
+      '预览成功': 'Preview successful', '转换完成': 'Conversion complete',
+      '已下载': 'Downloaded', '识别成功': 'Decoded successfully',
+      '完成': 'Done', '操作失败': 'Operation failed',
+      '格式化完成': 'Formatting complete',
+      'JSON → YAML 转换成功': 'JSON to YAML converted',
+      'YAML → JSON 转换成功': 'YAML to JSON converted',
+      '转换失败': 'Conversion failed',
+      /* Search & header */
+      '搜索工具（如 JSON、Base64、MD5）...': 'Search tools (e.g. JSON, Base64, MD5)...',
+      '切换主题': 'Toggle Theme', '菜单': 'Menu',
+      /* Timestamp */
+      '当前时间': 'Current Time',
+      '时间戳（秒）': 'Timestamp (sec)', '时间戳（毫秒）': 'Timestamp (ms)',
+      '本地时间': 'Local Time', 'UTC 时间': 'UTC Time',
+      '时间戳 → 日期': 'Timestamp to Date', '日期 → 时间戳': 'Date to Timestamp',
+      '单位': 'Unit', '秒': 'Seconds', '毫秒': 'Milliseconds',
+      '秒级时间戳': 'Timestamp (seconds)', '毫秒级时间戳': 'Timestamp (ms)',
+      '日期时间': 'Date Time',
+      '请输入有效数字': 'Please enter a valid number',
+      '日期格式错误': 'Invalid date format',
+      /* World time */
+      '北京': 'Beijing', '东京': 'Tokyo', '悉尼': 'Sydney',
+      '迪拜': 'Dubai', '莫斯科': 'Moscow', '巴黎': 'Paris',
+      '伦敦': 'London', '纽约': 'New York',
+      '温哥华': 'Vancouver', '洛杉矶': 'Los Angeles',
+      '北京时间（UTC+8）': 'Beijing Time (UTC+8)',
+      '🌏 全球主要城市': '🌏 Major World Cities',
+      '周日': 'Sun', '周一': 'Mon', '周二': 'Tue',
+      '周三': 'Wed', '周四': 'Thu', '周五': 'Fri', '周六': 'Sat',
+      'Unix 时间戳': 'Unix Timestamp',
+      'Unix 时间戳 · 点击复制': 'Unix Timestamp - Click to copy',
+      '点击复制': 'Click to copy',
+      /* Regex */
+      '正则表达式': 'Regex Pattern', '标志': 'Flags',
+      '未匹配到任何内容': 'No matches found',
+      '正则错误': 'Regex error',
+      '替换为（用于替换模式，$1 $2 可引用分组）': 'Replace with ($1 $2 for groups)',
+      /* QR Code */
+      '输入文本/URL': 'Input Text/URL',
+      '输入要生成二维码的内容': 'Enter content for QR code',
+      '尺寸（像素）': 'Size (px)', '纠错等级': 'Error Correction',
+      '输入内容后点击「生成二维码」': 'Enter content and click Generate',
+      '请输入内容': 'Please enter content',
+      '请先生成二维码': 'Please generate QR code first',
+      /* Color */
+      '从 HEX 转换': 'From HEX', '从 RGB 转换': 'From RGB',
+      '从 HSL 转换': 'From HSL',
+      'HEX 格式错误': 'Invalid HEX', 'RGB 格式错误': 'Invalid RGB',
+      'HSL 格式错误': 'Invalid HSL',
+      /* JWT */
+      '输入 JWT Token': 'Input JWT Token',
+      '段': 'Part', '内容': 'Content',
+      '时间字段解析': 'Time Field Analysis',
+      '字段': 'Field',
+      /* Radix */
+      '输入数值': 'Input Value', '输入进制': 'From Base',
+      '进制': 'Base', '值': 'Value',
+      '二进制 (2)': 'Binary (2)', '八进制 (8)': 'Octal (8)',
+      '十进制 (10)': 'Decimal (10)', '十六进制 (16)': 'Hex (16)',
+      '输入数值无效': 'Invalid number',
+      '转换成功': 'Converted successfully',
+      /* Postcode */
+      '🔍 邮编反查（根据邮编查省市区）': '🔍 Reverse Lookup (Code to Region)',
+      '输入邮政编码': 'Enter Postal Code',
+      '6 位邮政编码，如 100089': '6-digit postal code, e.g. 100089',
+      '📮 省市区查邮编': '📮 Forward Lookup (Region to Code)',
+      '省份': 'Province', '城市': 'City', '区/县': 'District',
+      '请选择省份': 'Select province',
+      '请先选择省份': 'Select province first',
+      '请选择城市': 'Select city',
+      '请先选择城市': 'Select city first',
+      '请选择区/县': 'Select district',
+      '查询邮编': 'Lookup Code', '复制邮编': 'Copy Code',
+      '格式错误：邮政编码应为 6 位数字': 'Invalid: postal code must be 6 digits',
+      '未找到对应地区': 'No matching region found',
+      '未找到匹配记录': 'No matching records found',
+      /* ID Card */
+      '🎲 测试号码生成': '🎲 Test Number Generator',
+      '性别': 'Gender', '男': 'Male', '女': 'Female', '随机': 'Random',
+      '出生年份范围': 'Birth Year Range',
+      '校验并解析': 'Validate & Parse',
+      '校验失败': 'Validation Failed', '校验通过': 'Validation Passed',
+      '身份证号码有效': 'ID number is valid',
+      '项目': 'Field', '身份证号码': 'ID Number',
+      '出生日期': 'Date of Birth', '年龄': 'Age',
+      '顺序码': 'Sequence Code', '校验码': 'Check Digit',
+      '校验码错误': 'Check digit error', '格式错误': 'Format error',
+      '出生日期无效': 'Invalid birth date',
+      '📋 号码校验与解析': '📋 Validate & Parse',
+      '输入身份证号码': 'Enter ID Number',
+      '18 位身份证号码': '18-digit ID number',
+      /* License */
+      '代码类型': 'Code Type',
+      '统一社会信用代码（18 位）': 'USCC (18 digits)',
+      '营业执照注册号（15 位）': 'Business License No. (15 digits)',
+      '登记管理部门（仅 18 位）': 'Registration Dept (18-digit only)',
+      '9 · 工商': '9 - Industry & Commerce',
+      '1 · 机构编制': '1 - Institution',
+      '5 · 民政': '5 - Civil Affairs',
+      'Y · 其他': 'Y - Other',
+      '输入统一社会信用代码 / 营业执照注册号': 'Enter USCC or Business License No.',
+      '18 位统一社会信用代码 或 15 位注册号': '18-digit USCC or 15-digit License No.',
+      '统一社会信用代码有效（18 位）': 'USCC is valid (18 digits)',
+      '营业执照注册号有效（15 位）': 'Business License No. is valid (15 digits)',
+      '类型': 'Type', '登记管理部门': 'Registration Dept',
+      '机构类别': 'Organization Type',
+      '登记管理机关': 'Registration Authority',
+      '主体标识码': 'Subject Code',
+      '统一社会信用代码': 'USCC',
+      '营业执照注册号': 'Business License No.',
+      '长度错误': 'Length error', '字符非法': 'Illegal character',
+      '企业': 'Enterprise', '个体工商户': 'Individual Business',
+      '农民专业合作社': 'Farmer Cooperative',
+      '机构编制': 'Institution', '民政': 'Civil Affairs',
+      '工商': 'Industry & Commerce', '其他': 'Other',
+      /* AES */
+      '密钥（Key）': 'Key', '模式': 'Mode',
+      '解密失败：请检查密钥和密文': 'Decryption failed: check key and ciphertext',
+      '解密结果为空': 'Decryption result is empty',
+      /* Hash */
+      '哈希算法': 'Hash Algorithm',
+      'MD5（128 位）': 'MD5 (128-bit)',
+      'SHA1（160 位）': 'SHA1 (160-bit)',
+      'SHA256（256 位）': 'SHA256 (256-bit)',
+      'SHA512（512 位）': 'SHA512 (512-bit)',
+      '输出大写': 'Uppercase output', '计算哈希': 'Calculate Hash',
+      /* UUID */
+      '生成数量': 'Count', '格式': 'Format',
+      '小写（默认）': 'Lowercase (default)', '大写': 'Uppercase',
+      '是否带连字符': 'Hyphens', '带连字符': 'With hyphens',
+      '无连字符': 'Without hyphens',
+      /* Base64 */
+      'URL Safe（用 -_ 替换 +/，去掉 =）': 'URL Safe (replace +/ with -_, strip =)',
+      /* Password */
+      '密码长度': 'Password Length',
+      '小写字母 a-z': 'Lowercase a-z', '大写字母 A-Z': 'Uppercase A-Z',
+      '数字 0-9': 'Digits 0-9', '特殊符号 !@#$%^&*': 'Symbols !@#$%^&*',
+      '排除易混字符 (0O1lI|)': 'Exclude ambiguous (0O1lI|)',
+      '请至少选择一种字符类型': 'Select at least one character type',
+      /* Image Base64 */
+      '🖼️ 图片转 Base64': '🖼️ Image to Base64',
+      '点击选择或拖拽图片到此处': 'Click to select or drag image here',
+      '支持 PNG / JPEG / GIF / WebP / SVG': 'Supports PNG / JPEG / GIF / WebP / SVG',
+      '复制 data URI': 'Copy Data URI', '复制纯 Base64': 'Copy Raw Base64',
+      '🔁 Base64 转图片': '🔁 Base64 to Image',
+      '粘贴 Base64 或 data URI': 'Paste Base64 or data URI',
+      '请选择图片文件': 'Please select an image file',
+      '请粘贴 Base64 内容': 'Please paste Base64 content',
+      '无法解析为图片，请检查 Base64 内容': 'Cannot parse as image, check Base64',
+      '点击选择或拖拽二维码图片到此处': 'Click to select or drag QR image here',
+      '支持 PNG / JPEG / GIF / BMP': 'Supports PNG / JPEG / GIF / BMP',
+      '❌ 未识别到二维码': '❌ No QR code found',
+      '未识别到二维码，请确认图片清晰': 'No QR code found, ensure image is clear',
+      /* Diff */
+      '共': 'Total', '行': 'lines', '新增': 'added', '删除': 'deleted',
+      /* YAML */
+      '转换方向': 'Direction',
+      '粘贴 JSON 或 YAML 文本': 'Paste JSON or YAML text',
+      /* Text tool */
+      '一行一条，按行处理': 'One per line, processed by line',
+      '去重': 'Dedupe', '不去重': 'No dedupe',
+      '去重（保留首次）': 'Dedupe (keep first)',
+      '去重（保留末次）': 'Dedupe (keep last)',
+      '排序': 'Sort', '不排序': 'No sort',
+      '升序 (A-Z)': 'Ascending (A-Z)', '降序 (Z-A)': 'Descending (Z-A)',
+      '按长度': 'By length', '反转顺序': 'Reverse', '随机打乱': 'Shuffle',
+      '其他': 'Other', '无': 'None',
+      '去首尾空格': 'Trim whitespace', '去空行': 'Remove blank lines',
+      '去空格+去空行': 'Trim + remove blanks',
+      '复制结果': 'Copy Result',
+      '行数': 'Lines', '字符数': 'Chars',
+      '字节数(UTF-8)': 'Bytes (UTF-8)', '非空行': 'Non-blank lines',
+      /* Cron */
+      'Cron 表达式（5 段：分 时 日 月 周）': 'Cron expression (5 fields: min hour day month weekday)',
+      '如 0 9 * * 1-5（工作日9点）': 'e.g. 0 9 * * 1-5 (weekdays 9am)',
+      '中文说明': 'Description',
+      '未来 5 次执行时间': 'Next 5 Execution Times',
+      '分钟': 'Minute', '小时': 'Hour',
+      '日': 'Day', '月': 'Month', '星期': 'Weekday',
+      '需要 5 段：分 时 日 月 周': 'Need 5 fields: min hour day month weekday',
+      '表达式解析失败': 'Expression parse failed',
+      '表达式无效': 'Invalid expression',
+      '一年内无匹配时间': 'No matching time within a year',
+      /* IP calc */
+      '🌐 CIDR / 子网计算': '🌐 CIDR / Subnet Calculator',
+      'IP 地址 / CIDR': 'IP Address / CIDR',
+      '如 192.168.1.100/24': 'e.g. 192.168.1.100/24',
+      '🔗 同网段判断': '🔗 Same Subnet Check',
+      'IP 1 / CIDR': 'IP 1 / CIDR', 'IP 2': 'IP 2',
+      '格式应为 IP/前缀，如 192.168.1.100/24': 'Format: IP/prefix, e.g. 192.168.1.100/24',
+      '前缀应在 0-32 之间': 'Prefix must be 0-32',
+      'IP 地址': 'IP Address', 'CIDR 前缀': 'CIDR Prefix',
+      '子网掩码': 'Subnet Mask', '通配符掩码': 'Wildcard Mask',
+      '网络地址': 'Network Address', '广播地址': 'Broadcast Address',
+      '可用主机范围': 'Usable Host Range',
+      '可用主机数': 'Usable Hosts', 'IP 类型': 'IP Type',
+      'A 类私有': 'Class A Private', 'B 类私有': 'Class B Private',
+      'C 类私有': 'Class C Private', '公网': 'Public',
+      '✅ 同网段': '✅ Same Subnet', '❌ 不同网段': '❌ Different Subnet',
+      'IP1 需含 CIDR 前缀，如 192.168.1.10/24': 'IP1 needs CIDR prefix, e.g. 192.168.1.10/24',
+      'IP2 格式错误': 'Invalid IP2 format',
+      /* SQL */
+      '粘贴需要格式化的 SQL 语句': 'Paste SQL to format',
+      '关键字': 'Keywords', '保持原样': 'Preserve', '缩进': 'Indent',
+      '2 空格': '2 Spaces', '4 空格': '4 Spaces',
+      '请输入 SQL': 'Please enter SQL',
+      /* QR decode */
+      '识别': 'Decode',
+      /* Hint texts */
+      '说明：输入完整的 6 位邮政编码，查询对应的省/市/区。数据本地内置，不会上传。':
+        'Enter a 6-digit postal code to look up province/city/district. Data is local.',
+      '说明：本工具仅在浏览器本地按 GB11643-1999 标准做格式校验与字段解析，不会上传任何数据。地区码仅解析到省级行政区。':
+        'Local validation per GB11643-1999. No data uploaded. Province-level only.',
+      '说明：本工具仅在浏览器本地按 GB 32100-2015（统一社会信用代码）与 GB 11714-1997（营业执照注册号）标准做格式校验与字段解析，不会上传任何数据。':
+        'Local validation per GB 32100-2015 & GB 11714-1997. No data uploaded.',
+      '⚠️ 生成的号码仅能通过校验位算法，不对应任何真实个人。仅限开发测试、表单填充等合法用途，请勿用于非法场景。':
+        '⚠️ Generated numbers pass checksum only, not real. For dev/testing only.',
+      '⚠️ 生成的号码仅能通过校验位算法，不对应任何真实企业。仅限开发测试、表单填充等合法用途，请勿用于非法场景。':
+        '⚠️ Generated numbers pass checksum only, not real. For dev/testing only.',
+      '提示：AES 加密结果为 Base64 字符串；解密时输入 Base64 密文。所有运算在本地完成。':
+        'Tip: AES output is Base64; enter Base64 ciphertext for decryption. All local.',
+      '使用 crypto.getRandomValues 生成密码学安全随机数，全部本地运算。':
+        'Uses crypto.getRandomValues for CSPRNG. All local.',
+      '依赖 js-yaml 库（CDN 加载），本地浏览器运算。':
+        'Uses js-yaml (CDN). All local.',
+      '基础格式化：关键字大写、主要子句换行缩进。非完整 SQL parser，复杂嵌套可能不完美。':
+        'Basic formatting: keyword casing, clause indentation. Not a full SQL parser.',
+      '支持 * / - , 和数字。示例：*/5 * * * *（每5分钟）、0 0 1 * *（每月1号）、0 9 * * 1-5（工作日9点）':
+        'Supports * / - , and numbers. e.g. */5 * * * * (every 5min), 0 0 1 * * (1st of month), 0 9 * * 1-5 (weekdays 9am)',
+    };
+    function t(zh) { return lang === 'zh' ? zh : (I18N[zh] || zh); }
+
+    function translateDOM(root) {
+      if (!root || lang === 'zh') return;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, null);
+      const textNodes = [];
+      let node;
+      while (node = walker.nextNode()) {
+        const trimmed = node.nodeValue.trim();
+        if (trimmed && I18N[trimmed]) textNodes.push({ node, orig: node.nodeValue, trimmed });
+      }
+      textNodes.forEach(({ node, orig, trimmed }) => {
+        node.nodeValue = orig.replace(trimmed, I18N[trimmed]);
+      });
+      root.querySelectorAll('*').forEach(el => {
+        ['placeholder', 'title'].forEach(attr => {
+          const v = el.getAttribute(attr);
+          if (v && I18N[v]) el.setAttribute(attr, I18N[v]);
+        });
+      });
+    }
+
+
+    /* ---------- 省、自治区、直辖市、特别行政区（前2位） ---------- */
+    const PROVINCES = {
+      '11': '北京市', '12': '天津市', '13': '河北省', '14': '山西省', '15': '内蒙古自治区',
+      '21': '辽宁省', '22': '吉林省', '23': '黑龙江省', '31': '上海市', '32': '江苏省',
+      '33': '浙江省', '34': '安徽省', '35': '福建省', '36': '江西省', '37': '山东省',
+      '41': '河南省', '42': '湖北省', '43': '湖南省', '44': '广东省', '45': '广西壮族自治区',
+      '46': '海南省', '50': '重庆市', '51': '四川省', '52': '贵州省', '53': '云南省',
+      '54': '西藏自治区', '61': '陕西省', '62': '甘肃省', '63': '青海省', '64': '宁夏回族自治区',
+      '65': '新疆维吾尔自治区', '71': '中国台湾', '81': '中国香港特别行政区', '82': '中国澳门特别行政区'
+    };
+
+    /** 用 PROVINCES 填充 <select> 选项（保留首项占位） */
+    function populateProvinceSelect(sel) {
+      const first = sel.options[0];
+      sel.innerHTML = '';
+      if (first) sel.appendChild(first.cloneNode(true));
+      Object.entries(PROVINCES).forEach(([code, name]) => {
+        const opt = document.createElement('option');
+        opt.value = code; opt.textContent = name;
+        sel.appendChild(opt);
+      });
+    }
+
+    /** 生成表格行的 HTML（用于校验结果展示） */
+    function tableRow(k, v, copyable = false, labelW = 140) {
+      const ve = escapeHtml(String(v));
+      return `<tr><td style="width:${labelW}px;">${k}</td><td class="mono">${ve}</td>
+        <td style="width:60px;">${copyable ? `<button class="btn sm ghost" data-copy-text="${ve}">复制</button>` : ''}</td></tr>`;
+    }
+
+    /* ---------- 工具定义 ---------- */
+    const TOOLS = [
+      // ===== 首页 =====
+      { id: 'home', group: '', name: '首页', icon: '🏠', render: renderHome },
+
+      // ===== JSON =====
+      { id: 'json', group: 'JSON', name: 'JSON 格式化', icon: '📊', desc: '格式化、压缩、校验 JSON 数据',
+        render: renderJson },
+      { id: 'yaml', group: 'JSON', name: 'JSON ↔ YAML', icon: '📋', desc: 'JSON 与 YAML 双向转换',
+        render: renderYaml },
+
+      // ===== 编码解码 =====
+      { id: 'base64', group: '编码解码', name: 'Base64', icon: '🔤', desc: 'Base64 编码与解码',
+        render: renderBase64 },
+      { id: 'url', group: '编码解码', name: 'URL 编码', icon: '🔗', desc: 'URL 编码与解码',
+        render: renderUrl },
+      { id: 'html-escape', group: '编码解码', name: 'HTML 转义', icon: '🛡️', desc: 'HTML 实体转义与反转义',
+        render: renderHtmlEscape },
+      { id: 'unicode', group: '编码解码', name: 'Unicode 转换', icon: '🌐', desc: '中文与 Unicode 互转',
+        render: renderUnicode },
+      { id: 'imgbase64', group: '编码解码', name: '图片 ↔ Base64', icon: '🖼️', desc: '图片转 Base64 / Base64 预览图片',
+        render: renderImgBase64 },
+
+      // ===== 证件工具 =====
+      { id: 'idcard', group: '证件工具', name: '身份证号', icon: '🪪', desc: '身份证号校验、解析（性别/生日/地区）',
+        render: renderIdCard },
+      { id: 'license', group: '证件工具', name: '营业执照号', icon: '🏢', desc: '统一社会信用代码 / 营业执照注册号校验解析',
+        render: renderLicense },
+      { id: 'postcode', group: '证件工具', name: '邮政编码', icon: '📮', desc: '省市区 ↔ 邮编 互查',
+        render: renderPostCode },
+
+      // ===== 加密哈希 =====
+      { id: 'hash', group: '加密哈希', name: 'MD5/SHA 哈希', icon: '🔐', desc: 'MD5、SHA1、SHA256、SHA512 哈希计算',
+        render: renderHash },
+      { id: 'aes', group: '加密哈希', name: 'AES 加解密', icon: '🔑', desc: 'AES 对称加密与解密',
+        render: renderAes },
+
+      // ===== 文本工具 =====
+      { id: 'uuid', group: '文本工具', name: 'UUID 生成', icon: '🆔', desc: '批量生成 UUID/GUID',
+        render: renderUuid },
+      { id: 'timestamp', group: '文本工具', name: '时间戳', icon: '⏰', desc: '时间戳与日期互转',
+        render: renderTimestamp },
+      { id: 'worldtime', group: '文本工具', name: '世界时间', icon: '🌍', desc: '全球实时时间、时区查询',
+        render: renderWorldTime },
+      { id: 'regex', group: '文本工具', name: '正则测试', icon: '🔍', desc: '正则表达式匹配测试',
+        render: renderRegex },
+      { id: 'password', group: '文本工具', name: '密码生成器', icon: '🔐', desc: '自定义规则批量生成随机密码',
+        render: renderPassword },
+      { id: 'diff', group: '文本工具', name: '文本对比', icon: '⚖️', desc: '逐行对比两段文本差异',
+        render: renderDiff },
+      { id: 'texttool', group: '文本工具', name: '文本去重排序', icon: '📝', desc: '按行去重、排序、统计',
+        render: renderTextTool },
+      { id: 'cron', group: '文本工具', name: 'Cron 解析', icon: '⏱️', desc: 'Cron 表达式翻译 + 下次执行时间',
+        render: renderCron },
+
+      // ===== 其他 =====
+      { id: 'qrcode', group: '其他工具', name: '二维码生成', icon: '📱', desc: '生成二维码图片',
+        render: renderQrcode },
+      { id: 'color', group: '其他工具', name: '颜色转换', icon: '🎨', desc: 'RGB / HEX / HSL 互转',
+        render: renderColor },
+      { id: 'jwt', group: '其他工具', name: 'JWT 解析', icon: '🪙', desc: '解析 JWT Token 三段内容',
+        render: renderJwt },
+      { id: 'radix', group: '其他工具', name: '进制转换', icon: '🔢', desc: '二进制/八进制/十进制/十六进制互转',
+        render: renderRadix },
+      { id: 'ipcalc', group: '其他工具', name: 'IP 子网计算', icon: '🌐', desc: 'CIDR/掩码互转、网络/广播地址、同网段判断',
+        render: renderIpCalc },
+      { id: 'sql', group: '其他工具', name: 'SQL 格式化', icon: '🗃️', desc: 'SQL 关键字大写、换行缩进',
+        render: renderSql },
+      { id: 'qrdecode', group: '其他工具', name: '二维码识别', icon: '📷', desc: '上传图片识别二维码内容',
+        render: renderQrDecode },
+    ];
+
+    /* ---------- 路由 ---------- */
+    function getHash() { return location.hash.slice(1) || 'home'; }
+    function navigate(id) { location.hash = id; }
+
+    function route() {
+      const id = getHash();
+      const tool = TOOLS.find(t => t.id === id) || TOOLS[0];
+
+      // 高亮导航
+      $$('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.id === tool.id));
+
+      // 渲染主区
+      const main = $('#main');
+      main.innerHTML = '';
+      tool.render(main);
+
+      // 滚动到顶
+      main.scrollTop = 0;
+      translateDOM(main);
+    }
+
+    /* ---------- 渲染侧边栏 ---------- */
+    function renderSidebar() {
+      const sb = $('#sidebar');
+      const groups = {};
+      TOOLS.forEach(t => {
+        const g = t.group || '首页';
+        (groups[g] = groups[g] || []).push(t);
+      });
+      let html = '';
+      Object.entries(groups).forEach(([g, list]) => {
+        html += `<div class="nav-group">
+          <div class="nav-group-title">${g || '常用'}</div>`;
+        list.forEach(t => {
+          html += `<div class="nav-item" data-id="${t.id}" data-href="#${t.id}">
+            <span class="icon">${t.icon}</span>
+            <span>${t.name}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      });
+      sb.innerHTML = html;
+      translateDOM(sb);
+      $$('.nav-item', sb).forEach(el => {
+        el.addEventListener('click', () => navigate(el.dataset.id));
+      });
+    }
+
+    /* ---------- 通用：工具页头 ---------- */
+    function toolHeader(tool) {
+      return `<div class="tool-header">
+        <div>
+          <div class="tool-title">${tool.icon} ${t(tool.name)}</div>
+          <div class="tool-desc">${t(tool.desc || '')}</div>
+        </div>
+      </div>`;
+    }
+
+    /* ---------- 通用：可复制输出框 ---------- */
+    function outputBox(text, { error = false } = {}) {
+      const cls = error ? 'output-box error' : 'output-box';
+      const empty = !text ? ' empty' : '';
+      return `<div class="${cls}${empty}">${escapeHtml(text || '（输出结果将显示在这里）')}</div>`;
+    }
+
+    /* ---------- 通用：带复制按钮的 textarea 容器 ---------- */
+    function textareaWrap(label, id, placeholder = '', value = '') {
+      return `<div class="field">
+        <label class="field-label">${t(label)}</label>
+        <div class="textarea-wrap">
+          <button class="copy-btn" data-copy-target="${id}">${t('复制')}</button>
+          <textarea class="textarea" id="${id}" placeholder="${t(placeholder)}">${escapeHtml(value)}</textarea>
+        </div>
+      </div>`;
+    }
+
+    /* =========================================================
+       工具实现
+       ========================================================= */
+
+    /* ---------- 首页 ---------- */
+    function renderHome(main) {
+      const tools = TOOLS.filter(t => t.id !== 'home');
+      const html = `
+        <div style="display:flex;flex-direction:column;min-height:100%;">
+        <div class="tool-header">
+          <div>
+            <div class="tool-title">${t('🧰 开发者工具箱')}</div>
+            <div class="tool-desc">${t('日常开发常用工具集合 · 纯前端运行 · 数据不出本地')}</div>
+          </div>
+          <div class="home-clock" id="homeClock">
+            <div class="hc-row">
+              <span id="clockDisplay"></span>
+              <span class="date" id="dateDisplay"></span>
+            </div>
+            <span class="ts" id="timestampDisplay" title="${t('Unix 时间戳 · 点击复制')}"></span>
+          </div>
+        </div>
+        <div class="home-grid">
+          ${tools.map(tool => `
+            <div class="home-card" data-go="${tool.id}">
+              <div class="icon">${tool.icon}</div>
+              <div class="title">${t(tool.name)}</div>
+              <div class="desc">${t(tool.desc || '')}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="footer">
+          ${t('DevKit · 纯静态实现')}<br/>
+          ${t('所有计算均在浏览器本地完成，数据不会上传')}<br/>
+          <span style="margin-top:8px;display:inline-block;">Power by <strong>DH</strong> & <strong>ZPW</strong></span>
+        </div>
+        </div>
+      `;
+      main.innerHTML = html;
+      $$('.home-card', main).forEach(el => {
+        el.addEventListener('click', () => navigate(el.dataset.go));
+      });
+      // 时间戳点击复制
+      const $ts = document.getElementById('timestampDisplay');
+      if ($ts) $ts.addEventListener('click', () => copyText($ts.textContent));
+    }
+
+    /* ---------- JSON ---------- */
+    function renderJson(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'json')) + `
+        <div class="card">
+          ${textareaWrap('输入 JSON', 'jsonInput', '在此粘贴 JSON 文本，支持任意层级嵌套',
+            '{\n  "name": "DevKit",\n  "version": "1.0",\n  "tools": ["json", "base64", "md5"]\n}')}
+          <div class="btn-group">
+            <button class="btn primary" id="jsonFormat">格式化</button>
+            <button class="btn" id="jsonMinify">压缩</button>
+            <button class="btn" id="jsonValidate">校验</button>
+            <button class="btn" id="jsonEscape">转义</button>
+            <button class="btn" id="jsonUnescape">反转义</button>
+            <button class="btn ghost" id="jsonClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="jsonOutput">复制</button>
+            <textarea class="textarea lg" id="jsonOutput" placeholder="结果将显示在这里"></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#jsonInput', main), output = $('#jsonOutput', main);
+      const setOut = (v, err) => { output.value = v; if (err) toast(err, 'error'); };
+
+      $('#jsonFormat', main).onclick = () => {
+        try { setOut(JSON.stringify(JSON.parse(input.value), null, 2)); toast('格式化成功', 'success'); }
+        catch (e) { setOut('', true); toast('JSON 解析失败：' + e.message, 'error'); }
+      };
+      $('#jsonMinify', main).onclick = () => {
+        try { setOut(JSON.stringify(JSON.parse(input.value))); toast('压缩成功', 'success'); }
+        catch (e) { setOut('', true); toast('JSON 解析失败：' + e.message, 'error'); }
+      };
+      $('#jsonValidate', main).onclick = () => {
+        try { JSON.parse(input.value); toast('✅ JSON 格式正确', 'success'); output.value = '✅ 有效的 JSON'; }
+        catch (e) { toast('❌ JSON 格式错误', 'error'); output.value = '❌ ' + e.message; }
+      };
+      $('#jsonEscape', main).onclick = () => {
+        output.value = input.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        toast('已转义', 'success');
+      };
+      $('#jsonUnescape', main).onclick = () => {
+        output.value = input.value.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        toast('已反转义', 'success');
+      };
+      $('#jsonClear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- Base64 ---------- */
+    function renderBase64(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'base64')) + `
+        <div class="card">
+          ${textareaWrap('输入文本', 'b64Input', '输入要编码/解码的内容', 'Hello DevKit')}
+          <div class="checkbox-row">
+            <input type="checkbox" id="b64UrlSafe"><label for="b64UrlSafe">URL Safe（用 -_ 替换 +/，去掉 =）</label>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="b64Encode">编码 →</button>
+            <button class="btn primary" id="b64Decode">← 解码</button>
+            <button class="btn ghost" id="b64Clear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="b64Output">复制</button>
+            <textarea class="textarea lg" id="b64Output" placeholder="结果将显示在这里"></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#b64Input', main), output = $('#b64Output', main);
+      const isUrlSafe = () => $('#b64UrlSafe', main).checked;
+
+      $('#b64Encode', main).onclick = () => {
+        try {
+          const utf8 = unescape(encodeURIComponent(input.value));
+          let r = btoa(utf8);
+          if (isUrlSafe()) r = r.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          output.value = r; toast('编码成功', 'success');
+        } catch (e) { toast('编码失败：' + e.message, 'error'); }
+      };
+      $('#b64Decode', main).onclick = () => {
+        try {
+          let s = input.value.trim();
+          if (isUrlSafe()) s = s.replace(/-/g, '+').replace(/_/g, '/');
+          while (s.length % 4) s += '=';
+          output.value = decodeURIComponent(escape(atob(s)));
+          toast('解码成功', 'success');
+        } catch (e) { toast('解码失败：请检查输入是否为有效 Base64', 'error'); }
+      };
+      $('#b64Clear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- URL 编码 ---------- */
+    function renderUrl(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'url')) + `
+        <div class="card">
+          ${textareaWrap('输入文本', 'urlInput', '输入要编码/解码的 URL 或文本', 'https://example.com/搜索?q=开发者工具')}
+          <div class="btn-group">
+            <button class="btn primary" id="urlEncodeAll">全编码 encodeURI</button>
+            <button class="btn primary" id="urlEncodeComp">组件编码 encodeURIComponent</button>
+            <button class="btn" id="urlDecodeAll">全解码 decodeURI</button>
+            <button class="btn" id="urlDecodeComp">组件解码 decodeURIComponent</button>
+            <button class="btn ghost" id="urlClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="urlOutput">复制</button>
+            <textarea class="textarea lg" id="urlOutput" placeholder="结果将显示在这里"></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#urlInput', main), output = $('#urlOutput', main);
+      const safe = fn => () => {
+        try { output.value = fn(input.value); toast('完成', 'success'); }
+        catch (e) { toast('操作失败：' + e.message, 'error'); }
+      };
+      $('#urlEncodeAll', main).onclick = safe(encodeURI);
+      $('#urlEncodeComp', main).onclick = safe(encodeURIComponent);
+      $('#urlDecodeAll', main).onclick = safe(decodeURI);
+      $('#urlDecodeComp', main).onclick = safe(decodeURIComponent);
+      $('#urlClear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- HTML 转义 ---------- */
+    function renderHtmlEscape(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'html-escape')) + `
+        <div class="card">
+          ${textareaWrap('输入文本', 'htmlInput', '输入要转义/反转义的 HTML 文本',
+            '<div class="box">Hello & "World"</div>')}
+          <div class="btn-group">
+            <button class="btn primary" id="htmlEscape">转义 →</button>
+            <button class="btn primary" id="htmlUnescape">← 反转义</button>
+            <button class="btn ghost" id="htmlClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="htmlOutput">复制</button>
+            <textarea class="textarea lg" id="htmlOutput" placeholder="结果将显示在这里"></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#htmlInput', main), output = $('#htmlOutput', main);
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      const rmap = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#x27;': "'", '&apos;': "'" };
+      $('#htmlEscape', main).onclick = () => {
+        output.value = input.value.replace(/[&<>"']/g, c => map[c]);
+        toast('已转义', 'success');
+      };
+      $('#htmlUnescape', main).onclick = () => {
+        output.value = input.value.replace(/&(amp|lt|gt|quot|#39|#x27|apos);/g, m => rmap[m]);
+        toast('已反转义', 'success');
+      };
+      $('#htmlClear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- Unicode ---------- */
+    function renderUnicode(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'unicode')) + `
+        <div class="card">
+          ${textareaWrap('输入文本', 'uniInput', '中文 ↔ Unicode（\\uXXXX）', '开发者工具箱 DevKit')}
+          <div class="btn-group">
+            <button class="btn primary" id="uniEncode">中文 → Unicode</button>
+            <button class="btn primary" id="uniDecode">Unicode → 中文</button>
+            <button class="btn" id="uniEncodeAll">全部 → Unicode</button>
+            <button class="btn ghost" id="uniClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="uniOutput">复制</button>
+            <textarea class="textarea lg" id="uniOutput" placeholder="结果将显示在这里"></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#uniInput', main), output = $('#uniOutput', main);
+      $('#uniEncode', main).onclick = () => {
+        output.value = input.value.replace(/[\u4e00-\u9fa5]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+        toast('已转换', 'success');
+      };
+      $('#uniEncodeAll', main).onclick = () => {
+        output.value = input.value.split('').map(c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+        toast('已转换', 'success');
+      };
+      $('#uniDecode', main).onclick = () => {
+        output.value = input.value.replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+        toast('已转换', 'success');
+      };
+      $('#uniClear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- 哈希 ---------- */
+    function renderHash(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'hash')) + `
+        <div class="card">
+          ${textareaWrap('输入文本', 'hashInput', '输入要计算哈希的文本', 'Hello DevKit')}
+          <div class="field">
+            <label class="field-label">哈希算法</label>
+            <select class="select" id="hashAlgo">
+              <option value="MD5">MD5（128 位）</option>
+              <option value="SHA1">SHA1（160 位）</option>
+              <option value="SHA256" selected>SHA256（256 位）</option>
+              <option value="SHA224">SHA224</option>
+              <option value="SHA384">SHA384</option>
+              <option value="SHA512">SHA512（512 位）</option>
+              <option value="SHA3">SHA3</option>
+              <option value="RIPEMD160">RIPEMD160</option>
+            </select>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="hashUpper" checked><label for="hashUpper">输出大写</label>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="hashCalc">计算哈希</button>
+            <button class="btn ghost" id="hashClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="hashOutput">复制</button>
+            <textarea class="textarea" id="hashOutput" placeholder="哈希值将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#hashInput', main), output = $('#hashOutput', main);
+      $('#hashCalc', main).onclick = () => {
+        const algo = $('#hashAlgo', main).value;
+        const upper = $('#hashUpper', main).checked;
+        try {
+          let r = CryptoJS[algo](input.value).toString();
+          output.value = upper ? r.toUpperCase() : r;
+          toast(lang === 'en' ? `${algo} done` : `${algo} 计算完成`, 'success');
+        } catch (e) { toast('计算失败：' + e.message, 'error'); }
+      };
+      $('#hashClear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- AES ---------- */
+    function renderAes(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'aes')) + `
+        <div class="card">
+          ${textareaWrap('输入文本', 'aesInput', '输入要加密/解密的内容', 'Hello DevKit')}
+          <div class="row">
+            <div class="field">
+              <label class="field-label">密钥（Key）</label>
+              <input class="input" id="aesKey" type="text" value="my-secret-key-123" />
+            </div>
+            <div class="field">
+              <label class="field-label">模式</label>
+              <select class="select" id="aesMode">
+                <option value="CBC" selected>CBC</option>
+                <option value="ECB">ECB</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint">提示：AES 加密结果为 Base64 字符串；解密时输入 Base64 密文。所有运算在本地完成。</div>
+          <div class="btn-group">
+            <button class="btn primary" id="aesEncrypt">加密 →</button>
+            <button class="btn primary" id="aesDecrypt">← 解密</button>
+            <button class="btn ghost" id="aesClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="aesOutput">复制</button>
+            <textarea class="textarea lg" id="aesOutput" placeholder="结果将显示在这里"></textarea>
+          </div>
+        </div>
+      `;
+      const input = $('#aesInput', main), output = $('#aesOutput', main);
+      $('#aesEncrypt', main).onclick = () => {
+        try {
+          const pass = $('#aesKey', main).value;
+          const mode = $('#aesMode', main).value;
+          const opt = { mode: CryptoJS.mode[mode] };
+          const r = CryptoJS.AES.encrypt(input.value, pass, opt);
+          output.value = r.toString();
+          toast('加密成功', 'success');
+        } catch (e) { toast('加密失败：' + e.message, 'error'); }
+      };
+      $('#aesDecrypt', main).onclick = () => {
+        try {
+          const pass = $('#aesKey', main).value;
+          const mode = $('#aesMode', main).value;
+          const opt = { mode: CryptoJS.mode[mode] };
+          const r = CryptoJS.AES.decrypt(input.value, pass, opt);
+          output.value = r.toString(CryptoJS.enc.Utf8);
+          if (!output.value) throw new Error('解密结果为空');
+          toast('解密成功', 'success');
+        } catch (e) { toast('解密失败：请检查密钥和密文', 'error'); }
+      };
+      $('#aesClear', main).onclick = () => { input.value = ''; output.value = ''; };
+    }
+
+    /* ---------- UUID ---------- */
+    function renderUuid(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'uuid')) + `
+        <div class="card">
+          <div class="row">
+            <div class="field">
+              <label class="field-label">生成数量</label>
+              <input class="input" id="uuidCount" type="number" value="5" min="1" max="100" />
+            </div>
+            <div class="field">
+              <label class="field-label">格式</label>
+              <select class="select" id="uuidUpper">
+                <option value="0">小写（默认）</option>
+                <option value="1">大写</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">是否带连字符</label>
+              <select class="select" id="uuidDash">
+                <option value="1">带连字符</option>
+                <option value="0">无连字符</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="uuidGen">生成 UUID</button>
+            <button class="btn" id="uuidCopyAll">复制全部</button>
+            <button class="btn ghost" id="uuidClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="uuidOutput">复制</button>
+            <textarea class="textarea lg" id="uuidOutput" placeholder="生成的 UUID 列表将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      function uuidv4() {
+        if (crypto.randomUUID) return crypto.randomUUID();
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+      }
+      $('#uuidGen', main).onclick = () => {
+        const n = Math.min(100, Math.max(1, parseInt($('#uuidCount', main).value) || 1));
+        const upper = $('#uuidUpper', main).value === '1';
+        const dash = $('#uuidDash', main).value === '1';
+        const list = [];
+        for (let i = 0; i < n; i++) {
+          let u = uuidv4();
+          if (!dash) u = u.replace(/-/g, '');
+          if (upper) u = u.toUpperCase();
+          list.push(u);
+        }
+        $('#uuidOutput', main).value = list.join('\n');
+        toast(lang === 'en' ? `Generated ${n} UUIDs` : `已生成 ${n} 个 UUID`, 'success');
+      };
+      $('#uuidCopyAll', main).onclick = () => copyText($('#uuidOutput', main).value);
+      $('#uuidClear', main).onclick = () => { $('#uuidOutput', main).value = ''; };
+    }
+
+    /* ---------- 时间戳 ---------- */
+    function renderTimestamp(main) {
+      const now = Math.floor(Date.now() / 1000);
+      const nowMs = Date.now();
+      const nowDate = new Date();
+      const fmt = (d) => {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      };
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'timestamp')) + `
+        <div class="card">
+          <div class="field">
+            <label class="field-label">当前时间</label>
+            <table class="table">
+              <tr><th>${t('时间戳（秒）')}</th><th>${t('时间戳（毫秒）')}</th><th>${t('本地时间')}</th><th>${t('UTC 时间')}</th></tr>
+              <tr>
+                <td class="mono" id="tsNow">${now}</td>
+                <td class="mono" id="tsNowMs">${nowMs}</td>
+                <td class="mono" id="tsNowLocal">${fmt(nowDate)}</td>
+                <td class="mono" id="tsNowUtc">${nowDate.toISOString()}</td>
+              </tr>
+            </table>
+            <button class="btn sm" id="tsRefresh" style="margin-top:8px;">🔄 刷新</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">时间戳 → 日期</h3>
+          <div class="row">
+            <div class="field">
+              <label class="field-label">时间戳</label>
+              <input class="input" id="ts2dInput" type="text" value="${now}" placeholder="秒或毫秒" />
+            </div>
+            <div class="field">
+              <label class="field-label">单位</label>
+              <select class="select" id="ts2dUnit">
+                <option value="s">秒</option>
+                <option value="ms">毫秒</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn primary" id="ts2dBtn">转换 →</button>
+          <div id="ts2dResult" style="margin-top:12px;"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">日期 → 时间戳</h3>
+          <div class="row">
+            <div class="field">
+              <label class="field-label">日期时间</label>
+              <input class="input" id="d2tsInput" type="text" value="${fmt(nowDate)}" placeholder="YYYY-MM-DD HH:mm:ss" />
+            </div>
+          </div>
+          <button class="btn primary" id="d2tsBtn">转换 →</button>
+          <div id="d2tsResult" style="margin-top:12px;"></div>
+        </div>
+      `;
+      const refresh = () => {
+        const n = Math.floor(Date.now() / 1000);
+        $('#tsNow', main).textContent = n;
+        $('#tsNowMs', main).textContent = Date.now();
+        $('#tsNowLocal', main).textContent = fmt(new Date());
+        $('#tsNowUtc', main).textContent = new Date().toISOString();
+      };
+      $('#tsRefresh', main).onclick = refresh;
+      const timer = setInterval(refresh, 1000);
+
+      $('#ts2dBtn', main).onclick = () => {
+        let v = parseInt($('#ts2dInput', main).value.trim());
+        if (isNaN(v)) { toast('请输入有效数字', 'error'); return; }
+        if ($('#ts2dUnit', main).value === 's') v *= 1000;
+        const d = new Date(v);
+        $('#ts2dResult', main).innerHTML = `
+          <table class="table">
+            <tr><th>${t('本地时间')}</th><th>${t('UTC 时间')}</th><th>ISO 8601</th></tr>
+            <tr>
+              <td class="mono">${fmt(d)}</td>
+              <td class="mono">${d.toUTCString()}</td>
+              <td class="mono">${d.toISOString()}</td>
+            </tr>
+          </table>`;
+      };
+      $('#d2tsBtn', main).onclick = () => {
+        const s = $('#d2tsInput', main).value.trim();
+        const d = new Date(s.replace(/-/g, '/'));
+        if (isNaN(d.getTime())) { toast('日期格式错误', 'error'); return; }
+        $('#d2tsResult', main).innerHTML = `
+          <table class="table">
+            <tr><th>${t('秒级时间戳')}</th><th>${t('毫秒级时间戳')}</th></tr>
+            <tr>
+              <td class="mono">${Math.floor(d.getTime() / 1000)}</td>
+              <td class="mono">${d.getTime()}</td>
+            </tr>
+          </table>`;
+      };
+      // 切换工具时清理定时器
+      main._cleanup = () => clearInterval(timer);
+    }
+
+    /* ---------- 世界时间 ---------- */
+    function renderWorldTime(main) {
+      const fmtTime = (d) => {
+        const p = n => String(n).padStart(2, '0');
+        return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      };
+      const fmtDate = (d) => {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+      };
+      const fmtWeekday = (d) => [t('周日'),t('周一'),t('周二'),t('周三'),t('周四'),t('周五'),t('周六')][d.getDay()];
+
+      const cities = [
+        { name: t('北京'), tz: 'Asia/Shanghai', emoji: '🇨🇳', offset: '+8' },
+        { name: t('东京'), tz: 'Asia/Tokyo', emoji: '🇯🇵', offset: '+9' },
+        { name: t('悉尼'), tz: 'Australia/Sydney', emoji: '🇦🇺', offset: '+10' },
+        { name: t('迪拜'), tz: 'Asia/Dubai', emoji: '🇦🇪', offset: '+4' },
+        { name: t('莫斯科'), tz: 'Europe/Moscow', emoji: '🇷🇺', offset: '+3' },
+        { name: t('巴黎'), tz: 'Europe/Paris', emoji: '🇫🇷', offset: '+2' },
+        { name: t('伦敦'), tz: 'Europe/London', emoji: '🇬🇧', offset: '+1' },
+        { name: t('纽约'), tz: 'America/New_York', emoji: '🇺🇸', offset: '-4' },
+        { name: t('温哥华'), tz: 'America/Vancouver', emoji: '🇨🇦', offset: '-7' },
+        { name: t('洛杉矶'), tz: 'America/Los_Angeles', emoji: '🇺🇸', offset: '-7' },
+      ];
+
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'worldtime')) + `
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+            <span style="font-size:32px;">🇨🇳</span>
+            <div>
+              <div style="font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:2px;" id="wtBeijing">--:--:--</div>
+              <div style="font-size:13px;color:var(--text-mute);" id="wtBeijingFull"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:11px;color:var(--text-mute);margin-bottom:2px;">${t('Unix 时间戳')}</div>
+            <div style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;color:var(--primary);" id="wtTs" title="点击复制"></div>
+          </div>
+          <div style="width:1px;height:32px;background:var(--border);"></div>
+          <div>
+            <div style="font-size:11px;color:var(--text-mute);margin-bottom:2px;">UTC</div>
+            <div class="mono" id="wtUtc" style="font-size:13px;"></div>
+          </div>
+          <div style="width:1px;height:32px;background:var(--border);"></div>
+          <div>
+            <div style="font-size:11px;color:var(--text-mute);margin-bottom:2px;">ISO 8601</div>
+            <div class="mono" id="wtIso" style="font-size:13px;"></div>
+          </div>
+          <div style="width:1px;height:32px;background:var(--border);"></div>
+          <div>
+            <div style="font-size:11px;color:var(--text-mute);margin-bottom:2px;">${t('本地时间')}</div>
+            <div class="mono" id="wtLocal" style="font-size:13px;"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🌏 全球主要城市</h3>
+          <div class="wt-city-grid">${cities.map(c => `
+            <div class="wt-city">
+              <div class="wt-city-head">
+                <span>${c.emoji}</span>
+                <span style="font-weight:600;">${c.name}</span>
+                <span style="font-size:11px;color:var(--text-mute);">UTC${c.offset}</span>
+              </div>
+              <div class="wt-city-time" data-tz="${c.tz}">--:--:--</div>
+              <div class="wt-city-date" data-tz="${c.tz}"></div>
+            </div>
+          `).join('')}</div>
+        </div>
+      `;
+
+      const update = () => {
+        const now = new Date();
+
+        // 北京时间
+        const bj = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Shanghai' }));
+        $('#wtBeijing', main).textContent = fmtTime(bj);
+        $('#wtBeijingFull', main).textContent = `${fmtDate(bj)} ${fmtWeekday(bj)}  ·  ${t('北京时间（UTC+8）')}`;
+
+        // 时间戳
+        $('#wtTs', main).textContent = Math.floor(now.getTime() / 1000);
+        $('#wtUtc', main).textContent = now.toUTCString();
+        $('#wtIso', main).textContent = now.toISOString();
+        $('#wtLocal', main).textContent = `${fmtDate(now)} ${fmtTime(now)} ${fmtWeekday(now)}`;
+
+        // 各城市时间
+        $$('.wt-city-time', main).forEach(el => {
+          const tz = el.dataset.tz;
+          const d = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+          el.textContent = fmtTime(d);
+        });
+        $$('.wt-city-date', main).forEach(el => {
+          const tz = el.dataset.tz;
+          const d = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+          el.textContent = `${fmtDate(d)} ${fmtWeekday(d)}`;
+        });
+      };
+
+      update();
+      const timer = setInterval(update, 500);
+      $('#wtTs', main).addEventListener('click', () => copyText($('#wtTs', main).textContent));
+      main._cleanup = () => clearInterval(timer);
+    }
+
+    /* ---------- 正则测试 ---------- */
+    function renderRegex(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'regex')) + `
+        <div class="card">
+          <div class="row">
+            <div class="field">
+              <label class="field-label">正则表达式</label>
+              <input class="input" id="rePattern" type="text" value="\\d+" placeholder="如 \\d+ 匹配数字" />
+            </div>
+            <div class="field" style="max-width:200px;">
+              <label class="field-label">标志</label>
+              <input class="input" id="reFlags" type="text" value="g" placeholder="g i m" />
+            </div>
+          </div>
+          ${textareaWrap('测试文本', 'reText', '输入要匹配的文本', '我有 3 个苹果和 15 个橘子，共 18 个水果。')}
+          <div class="btn-group">
+            <button class="btn primary" id="reTest">测试匹配</button>
+            <button class="btn" id="reReplace">替换匹配</button>
+            <button class="btn ghost" id="reClear">清空</button>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <input class="input" id="reReplaceTo" type="text" placeholder="替换为（用于替换模式，$1 $2 可引用分组）" />
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div id="reResult"></div>
+        </div>
+      `;
+      const buildRe = () => {
+        const p = $('#rePattern', main).value;
+        const f = $('#reFlags', main).value;
+        return new RegExp(p, f);
+      };
+      $('#reTest', main).onclick = () => {
+        try {
+          const re = buildRe();
+          const text = $('#reText', main).value;
+          const matches = [...text.matchAll(re)];
+          if (!matches.length) {
+            $('#reResult', main).innerHTML = `<div class="output-box empty">${t('未匹配到任何内容')}</div>`;
+            return;
+          }
+          let html = `<div class="hint success">共匹配 ${matches.length} 处</div>`;
+          html += `<table class="table"><tr><th>#</th><th>${t('匹配内容')}</th><th>${t('位置')}</th><th>${t('分组')}</th></tr>`;
+          matches.forEach((m, i) => {
+            html += `<tr>
+              <td>${i + 1}</td>
+              <td class="mono">${escapeHtml(m[0])}</td>
+              <td class="mono">${m.index}-${m.index + m[0].length}</td>
+              <td class="mono">${m.slice(1).map(x => x == null ? '-' : escapeHtml(x)).join(', ')}</td>
+            </tr>`;
+          });
+          html += `</table>`;
+          $('#reResult', main).innerHTML = html;
+          toast(`匹配到 ${matches.length} 处`, 'success');
+        } catch (e) { toast('正则错误：' + e.message, 'error'); }
+      };
+      $('#reReplace', main).onclick = () => {
+        try {
+          const re = buildRe();
+          const text = $('#reText', main).value;
+          const to = $('#reReplaceTo', main).value;
+          const r = text.replace(re, to);
+          $('#reResult', main).innerHTML = `<label class="field-label">替换结果</label>
+            <div class="textarea-wrap">
+              <button class="copy-btn" data-copy-target="reReplaceOut">复制</button>
+              <textarea class="textarea" id="reReplaceOut">${escapeHtml(r)}</textarea>
+            </div>`;
+          toast('替换完成', 'success');
+        } catch (e) { toast('正则错误：' + e.message, 'error'); }
+      };
+      $('#reClear', main).onclick = () => { $('#reText', main).value = ''; $('#reResult', main).innerHTML = ''; };
+    }
+
+    /* ---------- 二维码 ---------- */
+    function renderQrcode(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'qrcode')) + `
+        <div class="card">
+          ${textareaWrap('输入文本/URL', 'qrInput', '输入要生成二维码的内容', 'https://github.com')}
+          <div class="row">
+            <div class="field">
+              <label class="field-label">尺寸（像素）</label>
+              <input class="input" id="qrSize" type="number" value="240" min="64" max="600" />
+            </div>
+            <div class="field">
+              <label class="field-label">纠错等级</label>
+              <select class="select" id="qrLevel">
+                <option value="L">L (7%)</option>
+                <option value="M" selected>M (15%)</option>
+                <option value="Q">Q (25%)</option>
+                <option value="H">H (30%)</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="qrGen">生成二维码</button>
+            <button class="btn" id="qrDownload">下载图片</button>
+            <button class="btn ghost" id="qrClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">二维码预览</label>
+          <div class="qrcode-box" id="qrBox">
+            <div style="color:var(--text-mute);font-style:italic;">${t('输入内容后点击「生成二维码」')}</div>
+          </div>
+        </div>
+      `;
+      let qrInstance = null;
+      $('#qrGen', main).onclick = () => {
+        const text = $('#qrInput', main).value.trim();
+        if (!text) { toast('请输入内容', 'error'); return; }
+        const size = parseInt($('#qrSize', main).value) || 240;
+        const level = $('#qrLevel', main).value;
+        const box = $('#qrBox', main);
+        box.innerHTML = '';
+        try {
+          qrInstance = new QRCode(box, {
+            text, width: size, height: size,
+            correctLevel: QRCode.CorrectLevel[level]
+          });
+          toast('已生成', 'success');
+        } catch (e) { toast('生成失败：' + e.message, 'error'); }
+      };
+      $('#qrDownload', main).onclick = () => {
+        const img = $('#qrBox canvas', main) || $('#qrBox img', main);
+        const canvas = $('#qrBox canvas', main);
+        if (canvas) {
+          const a = document.createElement('a');
+          a.download = 'qrcode.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+          toast('已下载', 'success');
+        } else {
+          toast('请先生成二维码', 'error');
+        }
+      };
+      $('#qrClear', main).onclick = () => {
+        $('#qrInput', main).value = '';
+        $('#qrBox', main).innerHTML = `<div style="color:var(--text-mute);font-style:italic;">${t('输入内容后点击「生成二维码」')}</div>`;
+      };
+    }
+
+    /* ---------- 颜色转换 ---------- */
+    function renderColor(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'color')) + `
+        <div class="card">
+          <div class="row" style="align-items:flex-end;">
+            <div class="field">
+              <label class="field-label">HEX</label>
+              <input class="input" id="cHex" type="text" value="#165dff" />
+            </div>
+            <div class="field">
+              <label class="field-label">RGB</label>
+              <input class="input" id="cRgb" type="text" value="rgb(22, 93, 255)" />
+            </div>
+            <div class="field">
+              <label class="field-label">HSL</label>
+              <input class="input" id="cHsl" type="text" value="hsl(219, 100%, 54%)" />
+            </div>
+            <div class="color-preview" id="cPreview" style="background:#165dff;"></div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="cFromHex">从 HEX 转换</button>
+            <button class="btn primary" id="cFromRgb">从 RGB 转换</button>
+            <button class="btn primary" id="cFromHsl">从 HSL 转换</button>
+            <input type="color" id="cPicker" value="#165dff" style="width:42px;height:34px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:var(--bg-soft);" />
+          </div>
+        </div>
+        <div class="card">
+          <label class="field-label">预览</label>
+          <div id="cPreviewBig" style="height:80px;border-radius:8px;background:#165dff;border:1px solid var(--border);"></div>
+        </div>
+      `;
+      function hexToRgb(hex) {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+        const n = parseInt(hex, 16);
+        return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+      }
+      function rgbToHex(r, g, b) {
+        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+      }
+      function rgbToHsl(r, g, b) {
+        r /= 255; g /= 255; b /= 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+        if (max === min) { h = s = 0; }
+        else {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+          }
+          h /= 6;
+        }
+        return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+      }
+      function hslToRgb(h, s, l) {
+        h /= 360; s /= 100; l /= 100;
+        let r, g, b;
+        if (s === 0) { r = g = b = l; }
+        else {
+          const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1; if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+          };
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1/3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1/3);
+        }
+        return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+      }
+      function updateAll(rgb) {
+        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+        $('#cHex', main).value = hex;
+        $('#cRgb', main).value = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+        $('#cHsl', main).value = `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+        $('#cPreview', main).style.background = hex;
+        $('#cPreviewBig', main).style.background = hex;
+        $('#cPicker', main).value = hex;
+      }
+      $('#cFromHex', main).onclick = () => {
+        try { updateAll(hexToRgb($('#cHex', main).value)); toast('已转换', 'success'); }
+        catch (e) { toast('HEX 格式错误', 'error'); }
+      };
+      $('#cFromRgb', main).onclick = () => {
+        const m = $('#cRgb', main).value.match(/(\d+)\D+(\d+)\D+(\d+)/);
+        if (!m) { toast('RGB 格式错误', 'error'); return; }
+        updateAll({ r: +m[1], g: +m[2], b: +m[3] });
+        toast('已转换', 'success');
+      };
+      $('#cFromHsl', main).onclick = () => {
+        const m = $('#cHsl', main).value.match(/(\d+)\D+(\d+)\D+(\d+)/);
+        if (!m) { toast('HSL 格式错误', 'error'); return; }
+        updateAll(hslToRgb(+m[1], +m[2], +m[3]));
+        toast('已转换', 'success');
+      };
+      $('#cPicker', main).oninput = (e) => updateAll(hexToRgb(e.target.value));
+    }
+
+    /* ---------- JWT ---------- */
+    function renderJwt(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'jwt')) + `
+        <div class="card">
+          ${textareaWrap('输入 JWT Token', 'jwtInput', '粘贴 JWT token（三段式，以 . 分隔）',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')}
+          <div class="btn-group">
+            <button class="btn primary" id="jwtDecode">解析</button>
+            <button class="btn ghost" id="jwtClear">清空</button>
+          </div>
+        </div>
+        <div class="card" id="jwtResultCard" style="display:none;">
+          <label class="field-label">解析结果</label>
+          <div id="jwtResult"></div>
+        </div>
+      `;
+      function b64urlDecode(s) {
+        s = s.replace(/-/g, '+').replace(/_/g, '/');
+        while (s.length % 4) s += '=';
+        return decodeURIComponent(escape(atob(s)));
+      }
+      $('#jwtDecode', main).onclick = () => {
+        const token = $('#jwtInput', main).value.trim();
+        const parts = token.split('.');
+        if (parts.length !== 3) { toast('JWT 格式错误：应为 3 段', 'error'); return; }
+        try {
+          const header = JSON.parse(b64urlDecode(parts[0]));
+          const payload = JSON.parse(b64urlDecode(parts[1]));
+          const card = $('#jwtResultCard', main);
+          card.style.display = 'block';
+          let html = `<table class="table">
+            <tr><th style="width:100px;">${t('段')}</th><th>${t('内容')}</th></tr>
+            <tr><td>Header</td><td class="mono"><pre style="margin:0;white-space:pre-wrap;">${escapeHtml(JSON.stringify(header, null, 2))}</pre></td></tr>
+            <tr><td>Payload</td><td class="mono"><pre style="margin:0;white-space:pre-wrap;">${escapeHtml(JSON.stringify(payload, null, 2))}</pre></td></tr>
+            <tr><td>Signature</td><td class="mono">${escapeHtml(parts[2])}</td></tr>
+          </table>`;
+          // 时间字段解析
+          const timeFields = ['iat', 'exp', 'nbf', 'auth_time'];
+          const timeInfo = Object.entries(payload)
+            .filter(([k]) => timeFields.includes(k))
+            .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td><td>${new Date(v * 1000).toLocaleString()}</td></tr>`)
+            .join('');
+          if (timeInfo) {
+            html += `<h3 style="margin:16px 0 8px;">时间字段解析</h3>
+              <table class="table"><tr><th>${t('字段')}</th><th>${t('时间戳')}</th><th>${t('本地时间')}</th></tr>${timeInfo}</table>`;
+          }
+          $('#jwtResult', main).innerHTML = html;
+          toast('解析成功', 'success');
+        } catch (e) { toast('解析失败：' + e.message, 'error'); }
+      };
+      $('#jwtClear', main).onclick = () => {
+        $('#jwtInput', main).value = '';
+        $('#jwtResultCard', main).style.display = 'none';
+      };
+    }
+
+    /* ---------- 进制转换 ---------- */
+    function renderRadix(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'radix')) + `
+        <div class="card">
+          <div class="field">
+            <label class="field-label">输入数值</label>
+            <input class="input" id="rInput" type="text" value="255" placeholder="输入数字" />
+          </div>
+          <div class="row">
+            <div class="field">
+              <label class="field-label">输入进制</label>
+              <select class="select" id="rFrom">
+                <option value="2">二进制 (2)</option>
+                <option value="8">八进制 (8)</option>
+                <option value="10" selected>十进制 (10)</option>
+                <option value="16">十六进制 (16)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn primary" id="rConvert">转换 →</button>
+        </div>
+        <div class="card">
+          <label class="field-label">转换结果</label>
+          <table class="table">
+            <tr><th>${t('进制')}</th><th>${t('值')}</th><th></th></tr>
+            <tr><td>二进制 (2)</td><td class="mono" id="r2">-</td><td><button class="btn sm ghost" data-copy="r2">复制</button></td></tr>
+            <tr><td>八进制 (8)</td><td class="mono" id="r8">-</td><td><button class="btn sm ghost" data-copy="r8">复制</button></td></tr>
+            <tr><td>十进制 (10)</td><td class="mono" id="r10">-</td><td><button class="btn sm ghost" data-copy="r10">复制</button></td></tr>
+            <tr><td>十六进制 (16)</td><td class="mono" id="r16">-</td><td><button class="btn sm ghost" data-copy="r16">复制</button></td></tr>
+          </table>
+        </div>
+      `;
+      $('#rConvert', main).onclick = () => {
+        const v = $('#rInput', main).value.trim();
+        const from = parseInt($('#rFrom', main).value);
+        const n = parseInt(v, from);
+        if (isNaN(n)) { toast('输入数值无效', 'error'); return; }
+        $('#r2', main).textContent = n.toString(2);
+        $('#r8', main).textContent = n.toString(8);
+        $('#r10', main).textContent = n.toString(10);
+        $('#r16', main).textContent = n.toString(16).toUpperCase();
+        toast('转换成功', 'success');
+      };
+    }
+
+    /* ---------- 邮政编码 ---------- */
+    function renderPostCode(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'postcode')) + `
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🔍 邮编反查（根据邮编查省市区）</h3>
+          <div class="field">
+            <label class="field-label">输入邮政编码</label>
+            <div class="row">
+              <input class="input" id="pcReverseInput" type="text" maxlength="6" placeholder="6 位邮政编码，如 100089" value="100089" />
+              <button class="btn primary" id="pcReverseBtn">查询</button>
+              <button class="btn ghost" id="pcReverseClear">清空</button>
+            </div>
+          </div>
+          <div class="hint">说明：输入完整的 6 位邮政编码，查询对应的省/市/区。数据本地内置，不会上传。</div>
+        </div>
+        <div class="card" id="pcReverseCard" style="display:none;">
+          <label class="field-label">查询结果</label>
+          <div id="pcReverseResultList" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:12px;">📮 省市区查邮编</h3>
+          <div class="row">
+            <div class="field">
+              <label class="field-label">省份</label>
+              <select class="select" id="pcProvince"><option value="">${t('请选择省份')}</option></select>
+            </div>
+            <div class="field">
+              <label class="field-label">城市</label>
+              <select class="select" id="pcCity"><option value="">${t('请先选择省份')}</option></select>
+            </div>
+            <div class="field">
+              <label class="field-label">区/县</label>
+              <select class="select" id="pcDistrict"><option value="">${t('请先选择城市')}</option></select>
+            </div>
+          </div>
+          <button class="btn primary" id="pcForwardBtn">查询邮编</button>
+        </div>
+        <div class="card" id="pcForwardCard" style="display:none;">
+          <label class="field-label">查询结果</label>
+          <div id="pcForwardResultList" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      `;
+
+      const DATA = window.POSTCODE_DATA || [];
+
+      /* ===== 邮编反查 ===== */
+      $('#pcReverseBtn', main).onclick = () => {
+        const code = $('#pcReverseInput', main).value.trim();
+        const card = $('#pcReverseCard', main);
+        const listEl = $('#pcReverseResultList', main);
+        card.style.display = 'block';
+
+        if (!/^\d{6}$/.test(code)) {
+          listEl.innerHTML = '<div class="tag danger" style="padding:12px 16px;border-radius:8px;display:block;">' + t('格式错误：邮政编码应为 6 位数字') + '</div>';
+          toast('格式错误', 'error');
+          return;
+        }
+        const matches = DATA.filter(d => d.code === code);
+        if (!matches.length) {
+          listEl.innerHTML = `<div class="tag danger" style="padding:12px 16px;border-radius:8px;display:block;">未查询到邮编 <strong>${code}</strong> 对应的地区</div>`;
+          toast('未找到对应地区', 'error');
+          return;
+        }
+
+        listEl.innerHTML = matches.map(m => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg-soft);border-radius:var(--radius);border:1px solid var(--border);gap:12px;">
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:15px;font-weight:600;color:var(--text);line-height:1.5;">${m.province} ${m.city} ${m.district}</div>
+              <div style="font-size:12px;color:var(--text-mute);margin-top:4px;">${m.province} / ${m.city} / ${m.district}</div>
+            </div>
+            <div style="flex-shrink:0;text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:var(--primary);letter-spacing:2px;font-family:'SF Mono',monospace;">${m.code}</div>
+              <button class="btn sm ghost" data-copy-text="${m.code}" style="margin-top:4px;">${t('复制邮编')}</button>
+            </div>
+          </div>`).join('');
+        toast(lang === 'en' ? `Found ${matches.length} records` : `找到 ${matches.length} 条记录`, 'success');
+      };
+      $('#pcReverseClear', main).onclick = () => {
+        $('#pcReverseInput', main).value = '';
+        $('#pcReverseCard', main).style.display = 'none';
+      };
+
+      /* ===== 省市区查邮编 ===== */
+      const provSel = $('#pcProvince', main);
+      const citySel = $('#pcCity', main);
+      const distSel = $('#pcDistrict', main);
+
+      const provinces = [...new Set(DATA.map(d => d.province))];
+      provinces.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p; opt.textContent = p;
+        provSel.appendChild(opt);
+      });
+
+      function fillCities() {
+        citySel.innerHTML = `<option value="">${t('请选择城市')}</option>`;
+        distSel.innerHTML = `<option value="">${t('请先选择城市')}</option>`;
+        const prov = provSel.value;
+        if (!prov) return;
+        const cities = [...new Set(DATA.filter(d => d.province === prov).map(d => d.city))];
+        cities.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c; opt.textContent = c;
+          citySel.appendChild(opt);
+        });
+      }
+      function fillDistricts() {
+        distSel.innerHTML = `<option value="">${t('请选择区/县')}</option>`;
+        const prov = provSel.value;
+        const city = citySel.value;
+        if (!city) return;
+        const dists = [...new Set(DATA.filter(d => d.province === prov && d.city === city).map(d => d.district))];
+        dists.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d; opt.textContent = d;
+          distSel.appendChild(opt);
+        });
+      }
+      provSel.addEventListener('change', fillCities);
+      citySel.addEventListener('change', fillDistricts);
+
+      $('#pcForwardBtn', main).onclick = () => {
+        const prov = provSel.value;
+        const city = citySel.value;
+        const dist = distSel.value;
+        const card = $('#pcForwardCard', main);
+        const listEl = $('#pcForwardResultList', main);
+        card.style.display = 'block';
+
+        if (!prov) { toast(t('请选择省份'), 'error'); return; }
+        let matches = DATA.filter(d => d.province === prov);
+        if (city) matches = matches.filter(d => d.city === city);
+        if (dist) matches = matches.filter(d => d.district === dist);
+
+        if (!matches.length) {
+          listEl.innerHTML = '<div class="tag danger" style="padding:12px 16px;border-radius:8px;display:block;">未找到匹配记录</div>';
+          toast('未找到匹配记录', 'error');
+          return;
+        }
+
+        listEl.innerHTML = matches.map(m => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg-soft);border-radius:var(--radius);border:1px solid var(--border);gap:12px;">
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:15px;font-weight:600;color:var(--text);line-height:1.5;">${m.district}</div>
+              <div style="font-size:12px;color:var(--text-mute);margin-top:4px;">${m.province} / ${m.city} / ${m.district}</div>
+            </div>
+            <div style="flex-shrink:0;text-align:center;">
+              <div style="font-size:22px;font-weight:700;color:var(--primary);letter-spacing:2px;font-family:'SF Mono',monospace;">${m.code}</div>
+              <button class="btn sm ghost" data-copy-text="${m.code}" style="margin-top:4px;">${t('复制邮编')}</button>
+            </div>
+          </div>`).join('');
+        toast(lang === 'en' ? `Found ${matches.length} records` : `找到 ${matches.length} 条记录`, 'success');
+      };
+    }
+
+
+    /* ---------- 身份证号 ---------- */
+    function renderIdCard(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'idcard')) + `
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🎲 测试号码生成</h3>
+          <div class="hint warning">⚠️ 生成的号码仅能通过校验位算法，不对应任何真实个人。仅限开发测试、表单填充等合法用途，请勿用于非法场景。</div>
+          <div class="row">
+            <div class="field">
+              <label class="field-label">性别</label>
+              <select class="select" id="genIdGender">
+                <option value="random">随机</option>
+                <option value="male">男</option>
+                <option value="female">女</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">出生年份范围</label>
+              <div class="row" style="gap:6px;">
+                <input class="input" id="genIdYearFrom" type="number" value="1960" min="1900" max="2020" />
+                <span style="align-self:center;color:var(--text-mute);">~</span>
+                <input class="input" id="genIdYearTo" type="number" value="2005" min="1900" max="2020" />
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label">省份</label>
+              <select class="select" id="genIdProvince">
+                <option value="random">随机</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="idGenBtn">🎲 生成</button>
+            <button class="btn" id="idGenCopyAll">复制全部</button>
+            <button class="btn ghost" id="idGenClear">清空结果</button>
+          </div>
+        </div>
+        <div class="card" id="idGenCard" style="display:none;">
+          <label class="field-label">生成结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="idGenOutput">复制</button>
+            <textarea class="textarea gen" id="idGenOutput" placeholder="生成的身份证号码将显示在这里" readonly></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:12px;">📋 号码校验与解析</h3>
+          <div class="field">
+            <label class="field-label">输入身份证号码</label>
+            <div class="row">
+              <input class="input" id="idInput" type="text" maxlength="18" placeholder="18 位身份证号码" value="11010519491231002X" />
+              <button class="btn primary" id="idCheck">校验并解析</button>
+              <button class="btn ghost" id="idClear">清空</button>
+            </div>
+          </div>
+          <div class="hint">说明：本工具仅在浏览器本地按 GB11643-1999 标准做格式校验与字段解析，不会上传任何数据。地区码仅解析到省级行政区。</div>
+        </div>
+        <div class="card" id="idResultCard" style="display:none;">
+          <div class="field" style="display:flex;align-items:center;gap:12px;">
+            <span id="idStatusTag"></span>
+            <span id="idStatusText" style="font-weight:600;"></span>
+          </div>
+          <table class="table" id="idTable"></table>
+        </div>
+      `;
+
+      // 权重与校验码映射（GB11643-1999）
+      const ID_WEIGHTS = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+      const ID_CHECK = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
+
+      // 填充省份下拉
+      populateProvinceSelect($('#genIdProvince', main));
+
+      function calcCheckCode(id17) {
+        let sum = 0;
+        for (let i = 0; i < 17; i++) sum += parseInt(id17[i], 10) * ID_WEIGHTS[i];
+        return ID_CHECK[sum % 11];
+      }
+
+      /* ===== 生成逻辑 ===== */
+      function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+      function pad(n, len) { return String(n).padStart(len, '0'); }
+
+      function genOneId() {
+        // 省份码
+        let provCode;
+        const provVal = $('#genIdProvince', main).value;
+        if (provVal === 'random') {
+          const codes = Object.keys(PROVINCES);
+          provCode = codes[randInt(0, codes.length - 1)];
+        } else {
+          provCode = provVal;
+        }
+        // 地区码后4位（市/县）随机
+        const distCode = provCode + pad(randInt(0, 99), 2) + pad(randInt(0, 99), 2);
+
+        // 出生日期
+        const yFrom = parseInt($('#genIdYearFrom', main).value) || 1960;
+        const yTo = parseInt($('#genIdYearTo', main).value) || 2005;
+        const yMin = Math.min(yFrom, yTo), yMax = Math.max(yFrom, yTo);
+        const year = randInt(yMin, yMax);
+        const month = randInt(1, 12);
+        // 当月天数
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const day = randInt(1, daysInMonth);
+        const birth = pad(year, 4) + pad(month, 2) + pad(day, 2);
+
+        // 顺序码
+        const genderVal = $('#genIdGender', main).value;
+        let seq;
+        if (genderVal === 'male') seq = randInt(0, 499) * 2 + 1;       // 奇数 001-999
+        else if (genderVal === 'female') seq = randInt(0, 499) * 2;    // 偶数 000-998
+        else seq = randInt(0, 999);
+        const seqStr = pad(seq, 3);
+
+        const body = distCode + birth + seqStr;
+        return body + calcCheckCode(body);
+      }
+
+      function doGen() {
+        const n = 5; // 默认生成 5 个
+        const list = [];
+        for (let i = 0; i < n; i++) list.push(genOneId());
+        $('#idGenCard', main).style.display = 'block';
+        $('#idGenOutput', main).value = list.join('\n');
+        toast(lang === 'en' ? `Generated ${n} test numbers` : `已生成 ${n} 个测试号码`, 'success');
+      }
+
+      $('#idGenBtn', main).onclick = doGen;
+      $('#idGenCopyAll', main).onclick = () => copyText($('#idGenOutput', main).value);
+      $('#idGenClear', main).onclick = () => {
+        $('#idGenOutput', main).value = '';
+        $('#idGenCard', main).style.display = 'none';
+      };
+
+
+      /* ===== 校验逻辑 ===== */
+      $('#idCheck', main).onclick = () => {
+        const id = $('#idInput', main).value.trim().toUpperCase();
+        const card = $('#idResultCard', main);
+        const tag = $('#idStatusTag', main);
+        const txt = $('#idStatusText', main);
+        const tbl = $('#idTable', main);
+        card.style.display = 'block';
+
+        const fail = (msg) => {
+          tag.innerHTML = lang === 'en' ? '<span class="tag danger">Validation Failed</span>' : '<span class="tag danger">校验失败</span>';
+          txt.style.color = 'var(--danger)';
+          txt.textContent = msg;
+          tbl.innerHTML = '';
+        };
+
+        if (!/^\d{17}[\dX]$/.test(id)) {
+          fail('格式错误：应为 17 位数字 + 1 位数字或 X');
+          toast('格式错误', 'error');
+          return;
+        }
+        const expected = calcCheckCode(id.slice(0, 17));
+        if (id[17] !== expected) {
+          fail(`校验码错误：第 18 位应为「${expected}」，实际为「${id[17]}」`);
+          toast('校验码错误', 'error');
+          return;
+        }
+
+        // 解析字段
+        const provinceCode = id.slice(0, 2);
+        const province = PROVINCES[provinceCode] || (lang === 'en' ? 'Unknown' : '未知地区');
+        const birthStr = id.slice(6, 14);
+        const year = birthStr.slice(0, 4), month = birthStr.slice(4, 6), day = birthStr.slice(6, 8);
+        const birthDate = new Date(`${year}-${month}-${day}`);
+        const isDateValid = birthDate instanceof Date && !isNaN(birthDate)
+          && birthDate.getFullYear() === parseInt(year)
+          && (birthDate.getMonth() + 1) === parseInt(month)
+          && birthDate.getDate() === parseInt(day);
+        if (!isDateValid) {
+          fail('出生日期无效');
+          toast('出生日期无效', 'error');
+          return;
+        }
+
+        const seq = parseInt(id.slice(14, 17), 10);
+        const gender = seq % 2 === 1 ? t('男') : t('女');
+
+        // 年龄计算
+        const now = new Date();
+        let age = now.getFullYear() - parseInt(year);
+        const mDiff = now.getMonth() + 1 - parseInt(month);
+        if (mDiff < 0 || (mDiff === 0 && now.getDate() < parseInt(day))) age--;
+
+        tag.innerHTML = lang === 'en' ? '<span class="tag success">Validation Passed</span>' : '<span class="tag success">校验通过</span>';
+        txt.style.color = 'var(--success)';
+        txt.textContent = t('身份证号码有效');
+        tbl.innerHTML = `
+          <tr><th style="width:140px;">${t('项目')}</th><th>${t('内容')}</th><th style="width:60px;"></th></tr>
+          ${tableRow(t('身份证号码'), id, true)}
+          ${tableRow(t('省份'), province)}
+          ${tableRow(t('出生日期'), `${year}-${month}-${day}`)}
+          ${tableRow(t('年龄'), age + (lang === 'en' ? ' yrs' : ' 岁'))}
+          ${tableRow(t('性别'), gender)}
+          ${tableRow(t('顺序码'), seq)}
+          ${tableRow(t('校验码'), id[17])}
+        `;
+        toast('校验通过', 'success');
+      };
+
+      $('#idClear', main).onclick = () => {
+        $('#idInput', main).value = '';
+        $('#idResultCard', main).style.display = 'none';
+      };
+    }
+
+    /* ---------- 营业执照号 ---------- */
+    function renderLicense(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'license')) + `
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🎲 测试号码生成</h3>
+          <div class="hint warning">⚠️ 生成的号码仅能通过校验位算法，不对应任何真实企业。仅限开发测试、表单填充等合法用途，请勿用于非法场景。</div>
+          <div class="row">
+            <div class="field">
+              <label class="field-label">代码类型</label>
+              <select class="select" id="genLcType">
+                <option value="usc">统一社会信用代码（18 位）</option>
+                <option value="reg">营业执照注册号（15 位）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">登记管理部门（仅 18 位）</label>
+              <select class="select" id="genLcDept">
+                <option value="random">随机</option>
+                <option value="9">9 · 工商</option>
+                <option value="1">1 · 机构编制</option>
+                <option value="5">5 · 民政</option>
+                <option value="Y">Y · 其他</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">省份</label>
+              <select class="select" id="genLcProvince">
+                <option value="random">随机</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="lcGenBtn">🎲 生成</button>
+            <button class="btn" id="lcGenCopyAll">复制全部</button>
+            <button class="btn ghost" id="lcGenClear">清空结果</button>
+          </div>
+        </div>
+        <div class="card" id="lcGenCard" style="display:none;">
+          <label class="field-label">生成结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="lcGenOutput">复制</button>
+            <textarea class="textarea gen" id="lcGenOutput" placeholder="生成的号码将显示在这里" readonly></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:12px;">📋 号码校验与解析</h3>
+          <div class="field">
+            <label class="field-label">输入统一社会信用代码 / 营业执照注册号</label>
+            <div class="row">
+              <input class="input" id="lcInput" type="text" maxlength="18" placeholder="18 位统一社会信用代码 或 15 位注册号" value="91350100M000100Y43" />
+              <button class="btn primary" id="lcCheck">校验并解析</button>
+              <button class="btn ghost" id="lcClear">清空</button>
+            </div>
+          </div>
+          <div class="hint">说明：本工具仅在浏览器本地按 GB 32100-2015（统一社会信用代码）与 GB 11714-1997（营业执照注册号）标准做格式校验与字段解析，不会上传任何数据。</div>
+        </div>
+        <div class="card" id="lcResultCard" style="display:none;">
+          <div class="field" style="display:flex;align-items:center;gap:12px;">
+            <span id="lcStatusTag"></span>
+            <span id="lcStatusText" style="font-weight:600;"></span>
+          </div>
+          <table class="table" id="lcTable"></table>
+        </div>
+      `;
+
+      /* ===== 统一社会信用代码（18位）校验 ===== */
+      const USC_CHARS = '0123456789ABCDEFGHJKLMNPQRTUWXY'; // 31 位字符集
+      const USC_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
+
+      const DEPT_MAP = {
+        '1': t('机构编制'), '5': t('民政'), '9': t('工商'), 'Y': t('其他')
+      };
+      const ORG_TYPE_BY_DEPT = {
+        '9': { '1': t('企业'), '2': t('个体工商户'), '3': t('农民专业合作社') },
+        '1': { '1': '机关', '2': '事业单位', '3': '中央编办直接管理机构编制的群众团体', '9': '其他' },
+        '5': { '1': '社会团体', '2': '民办非企业单位', '3': '基金会', '4': '宗教活动场所', '9': '其他' },
+        'Y': { '9': '其他' }
+      };
+
+      // 填充省份下拉
+      populateProvinceSelect($('#genLcProvince', main));
+
+      function uscCheckCode(code17) {
+        let sum = 0;
+        for (let i = 0; i < 17; i++) {
+          const idx = USC_CHARS.indexOf(code17[i]);
+          if (idx < 0) return null;
+          sum += idx * USC_WEIGHTS[i];
+        }
+        return USC_CHARS[(31 - (sum % 31)) % 31];
+      }
+
+      /* ===== 营业执照注册号（15位）校验 ===== */
+      function regNoCheckCode(code14) {
+        const weights = [];
+        for (let i = 14; i >= 1; i--) weights.push((Math.pow(2, i) % 11));
+        let sum = 0;
+        for (let i = 0; i < 14; i++) sum += parseInt(code14[i], 10) * weights[i];
+        const m = sum % 11;
+        return m === 10 ? 'X' : String(m);
+      }
+
+      /* ===== 生成逻辑 ===== */
+      function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+      function pad(n, len) { return String(n).padStart(len, '0'); }
+      function randChar(charset) { return charset[randInt(0, charset.length - 1)]; }
+
+      function genOneUsc() {
+        // 登记管理部门
+        let deptCode;
+        const deptVal = $('#genLcDept', main).value;
+        if (deptVal === 'random') {
+          deptCode = randChar('159Y');
+        } else {
+          deptCode = deptVal;
+        }
+        // 机构类别（根据部门可选范围）
+        const orgTypes = Object.keys(ORG_TYPE_BY_DEPT[deptCode] || { '1': '' });
+        const orgTypeCode = orgTypes[randInt(0, orgTypes.length - 1)];
+
+        // 行政区划码 6 位
+        let adminDiv;
+        const provVal = $('#genLcProvince', main).value;
+        if (provVal === 'random') {
+          const codes = Object.keys(PROVINCES);
+          adminDiv = codes[randInt(0, codes.length - 1)];
+        } else {
+          adminDiv = provVal;
+        }
+        adminDiv += pad(randInt(0, 99), 2) + pad(randInt(0, 99), 2);
+
+        // 主体标识码 9 位（从字符集随机取，避免 I O S Z V）
+        let subject = '';
+        for (let i = 0; i < 9; i++) subject += randChar(USC_CHARS);
+
+        const body = deptCode + orgTypeCode + adminDiv + subject;
+        return body + uscCheckCode(body);
+      }
+
+      function genOneRegNo() {
+        // 行政区划码 6 位
+        let adminDiv;
+        const provVal = $('#genLcProvince', main).value;
+        if (provVal === 'random') {
+          const codes = Object.keys(PROVINCES);
+          adminDiv = codes[randInt(0, codes.length - 1)];
+        } else {
+          adminDiv = provVal;
+        }
+        adminDiv += pad(randInt(0, 99), 2) + pad(randInt(0, 99), 2);
+
+        // 顺序码 8 位
+        let seq = '';
+        for (let i = 0; i < 8; i++) seq += randInt(0, 9);
+
+        const body = adminDiv + seq;
+        return body + regNoCheckCode(body);
+      }
+
+      function doGen() {
+        const type = $('#genLcType', main).value;
+        const n = 5; // 默认生成 5 个
+        const list = [];
+        for (let i = 0; i < n; i++) {
+          list.push(type === 'usc' ? genOneUsc() : genOneRegNo());
+        }
+        $('#lcGenCard', main).style.display = 'block';
+        $('#lcGenOutput', main).value = list.join('\n');
+        toast(lang === 'en' ? `Generated ${n} test numbers` : `已生成 ${n} 个测试号码`, 'success');
+      }
+
+      $('#lcGenBtn', main).onclick = doGen;
+      $('#lcGenCopyAll', main).onclick = () => copyText($('#lcGenOutput', main).value);
+      $('#lcGenClear', main).onclick = () => {
+        $('#lcGenOutput', main).value = '';
+        $('#lcGenCard', main).style.display = 'none';
+      };
+
+
+      $('#lcCheck', main).onclick = () => {
+        const code = $('#lcInput', main).value.trim().toUpperCase();
+        const card = $('#lcResultCard', main);
+        const tag = $('#lcStatusTag', main);
+        const txt = $('#lcStatusText', main);
+        const tbl = $('#lcTable', main);
+        card.style.display = 'block';
+
+        const fail = (msg) => {
+          tag.innerHTML = lang === 'en' ? '<span class="tag danger">Validation Failed</span>' : '<span class="tag danger">校验失败</span>';
+          txt.style.color = 'var(--danger)';
+          txt.textContent = msg;
+          tbl.innerHTML = '';
+        };
+
+        const rowLT = (k, v, copyable = false) => tableRow(k, v, copyable, 160);
+
+        // 统一社会信用代码（18 位）
+        if (code.length === 18) {
+          if (!/^[0-9A-Z]{18}$/.test(code)) {
+            fail('格式错误：应仅含数字与大写字母');
+            toast('格式错误', 'error');
+            return;
+          }
+          // 字符集校验
+          for (const c of code) {
+            if (USC_CHARS.indexOf(c) < 0) {
+              fail(`非法字符「${c}」：统一社会信用代码不含 I O S Z V`);
+              toast('字符非法', 'error');
+              return;
+            }
+          }
+          const expected = uscCheckCode(code.slice(0, 17));
+          if (code[17] !== expected) {
+            fail(`校验码错误：第 18 位应为「${expected}」，实际为「${code[17]}」`);
+            toast('校验码错误', 'error');
+            return;
+          }
+
+          const deptCode = code[0];
+          const orgTypeCode = code[1];
+          const adminDiv = code.slice(2, 8);
+          const subjectCode = code.slice(8, 17);
+          const province = PROVINCES[adminDiv.slice(0, 2)] || (lang === 'en' ? 'Unknown' : '未知地区');
+          const dept = DEPT_MAP[deptCode] || (lang === 'en' ? 'Unknown' : '未知');
+          const orgType = (ORG_TYPE_BY_DEPT[deptCode] && ORG_TYPE_BY_DEPT[deptCode][orgTypeCode]) || (lang === 'en' ? 'Unknown' : '未知');
+
+          tag.innerHTML = lang === 'en' ? '<span class="tag success">Validation Passed</span>' : '<span class="tag success">校验通过</span>';
+          txt.style.color = 'var(--success)';
+          txt.textContent = t('统一社会信用代码有效（18 位）');
+          tbl.innerHTML = `
+            <tr><th style="width:160px;">${t('项目')}</th><th>${t('内容')}</th><th style="width:60px;"></th></tr>
+            ${rowLT(t('统一社会信用代码'), code, true)}
+            ${rowLT(t('类型'), t('统一社会信用代码（18 位）'))}
+            ${rowLT(t('登记管理部门'), `${deptCode} · ${dept}`)}
+            ${rowLT(t('机构类别'), `${orgTypeCode} · ${orgType}`)}
+            ${rowLT(t('登记管理机关'), `${adminDiv} · ${province}`)}
+            ${rowLT(t('主体标识码'), subjectCode, true)}
+            ${rowLT(t('校验码'), code[17])}
+          `;
+          toast('校验通过', 'success');
+          return;
+        }
+
+        // 营业执照注册号（15 位）
+        if (code.length === 15) {
+          if (!/^\d{14}[\dX]$/.test(code)) {
+            fail('格式错误：15 位注册号应为 14 位数字 + 1 位校验码');
+            toast('格式错误', 'error');
+            return;
+          }
+          const expected = regNoCheckCode(code.slice(0, 14));
+          if (code[14] !== expected) {
+            fail(`校验码错误：第 15 位应为「${expected}」，实际为「${code[14]}」`);
+            toast('校验码错误', 'error');
+            return;
+          }
+          const adminDiv = code.slice(0, 6);
+          const province = PROVINCES[adminDiv.slice(0, 2)] || (lang === 'en' ? 'Unknown' : '未知地区');
+          const seq = code.slice(6, 14);
+
+          tag.innerHTML = lang === 'en' ? '<span class="tag success">Validation Passed</span>' : '<span class="tag success">校验通过</span>';
+          txt.style.color = 'var(--success)';
+          txt.textContent = t('营业执照注册号有效（15 位）');
+          tbl.innerHTML = `
+            <tr><th style="width:160px;">${t('项目')}</th><th>${t('内容')}</th><th style="width:60px;"></th></tr>
+            ${rowLT(t('营业执照注册号'), code, true)}
+            ${rowLT(t('类型'), t('营业执照注册号（15 位）'))}
+            ${rowLT(t('登记管理机关'), `${adminDiv} · ${province}`)}
+            ${rowLT(t('顺序码'), seq, true)}
+            ${rowLT(t('校验码'), code[14])}
+          `;
+          toast('校验通过', 'success');
+          return;
+        }
+
+        fail(`长度错误：当前 ${code.length} 位，应为 18 位（统一社会信用代码）或 15 位（营业执照注册号）`);
+        toast('长度错误', 'error');
+      };
+
+      $('#lcClear', main).onclick = () => {
+        $('#lcInput', main).value = '';
+        $('#lcResultCard', main).style.display = 'none';
+      };
+    }
+
+    /* ---------- 密码生成器 ---------- */
+    function renderPassword(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'password')) + `
+        <div class="card">
+          <div class="row">
+            <div class="field">
+              <label class="field-label">密码长度</label>
+              <input class="input" id="pwLen" type="number" value="16" min="1" max="128" />
+            </div>
+            <div class="field">
+              <label class="field-label">生成数量</label>
+              <input class="input" id="pwCount" type="number" value="5" min="1" max="100" />
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px 22px;margin:12px 0;">
+            <label><input type="checkbox" id="pwLower" checked> 小写字母 a-z</label>
+            <label><input type="checkbox" id="pwUpper" checked> 大写字母 A-Z</label>
+            <label><input type="checkbox" id="pwDigit" checked> 数字 0-9</label>
+            <label><input type="checkbox" id="pwSym" checked> 特殊符号 !@#$%^&*</label>
+            <label><input type="checkbox" id="pwNoAmb"> 排除易混字符 (0O1lI|)</label>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="pwGen">🎲 生成密码</button>
+            <button class="btn" id="pwCopyAll">复制全部</button>
+            <button class="btn ghost" id="pwClear">清空</button>
+          </div>
+          <div class="hint">使用 crypto.getRandomValues 生成密码学安全随机数，全部本地运算。</div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="pwOutput">复制</button>
+            <textarea class="textarea lg" id="pwOutput" placeholder="生成的密码将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      function genOne() {
+        const len = Math.min(128, Math.max(1, parseInt($('#pwLen', main).value) || 16));
+        const noAmb = $('#pwNoAmb', main).checked;
+        let pool = '';
+        if ($('#pwLower', main).checked) pool += 'abcdefghijklmnopqrstuvwxyz';
+        if ($('#pwUpper', main).checked) pool += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        if ($('#pwDigit', main).checked) pool += '0123456789';
+        if ($('#pwSym', main).checked) pool += '!@#$%^&*-_=+?';
+        if (noAmb) pool = pool.replace(/[0O1lI|]/g, '');
+        if (!pool) return '';
+        const arr = new Uint32Array(len);
+        crypto.getRandomValues(arr);
+        let out = '';
+        for (let i = 0; i < len; i++) out += pool[arr[i] % pool.length];
+        return out;
+      }
+      $('#pwGen', main).onclick = () => {
+        const n = Math.min(100, Math.max(1, parseInt($('#pwCount', main).value) || 1));
+        if (!$('#pwLower', main).checked && !$('#pwUpper', main).checked && !$('#pwDigit', main).checked && !$('#pwSym', main).checked) {
+          toast('请至少选择一种字符类型', 'error'); return;
+        }
+        const list = [];
+        for (let i = 0; i < n; i++) list.push(genOne());
+        $('#pwOutput', main).value = list.join('\n');
+        toast(lang === 'en' ? `Generated ${n} passwords` : `已生成 ${n} 个密码`, 'success');
+      };
+      $('#pwCopyAll', main).onclick = () => copyText($('#pwOutput', main).value);
+      $('#pwClear', main).onclick = () => { $('#pwOutput', main).value = ''; };
+    }
+
+    /* ---------- 图片 ↔ Base64 ---------- */
+    function renderImgBase64(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'imgbase64')) + `
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🖼️ 图片转 Base64</h3>
+          <div id="ibDrop" style="border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;">
+            <div style="font-size:32px;">📁</div>
+            <div style="margin-top:8px;color:var(--text-mute);">点击选择或拖拽图片到此处</div>
+            <div style="font-size:12px;color:var(--text-mute);margin-top:4px;">支持 PNG / JPEG / GIF / WebP / SVG</div>
+          </div>
+          <input type="file" id="ibFile" accept="image/*" style="display:none;" />
+          <div id="ibPreview" style="margin-top:16px;display:none;">
+            <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+              <img id="ibImg" style="max-width:240px;max-height:200px;border:1px solid var(--border);border-radius:8px;" />
+              <div style="flex:1;min-width:200px;">
+                <div id="ibMeta" style="color:var(--text-mute);font-size:13px;line-height:1.8;"></div>
+                <div class="btn-group" style="margin-top:8px;">
+                  <button class="btn" id="ibCopyData">复制 data URI</button>
+                  <button class="btn" id="ibCopyRaw">复制纯 Base64</button>
+                </div>
+              </div>
+            </div>
+            <div class="textarea-wrap" style="margin-top:12px;">
+              <button class="copy-btn" data-copy-target="ibOut">复制</button>
+              <textarea class="textarea" id="ibOut" rows="4" readonly style="font-size:12px;"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🔁 Base64 转图片</h3>
+          ${textareaWrap('粘贴 Base64 或 data URI', 'ibRev', '粘贴图片的 Base64 编码或 data:image/... URI')}
+          <div class="btn-group">
+            <button class="btn primary" id="ibRevBtn">预览图片</button>
+            <button class="btn ghost" id="ibRevClear">清空</button>
+          </div>
+          <div id="ibRevPreview" style="margin-top:16px;text-align:center;display:none;">
+            <img id="ibRevImg" style="max-width:100%;max-height:400px;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+        </div>
+      `;
+      const drop = $('#ibDrop', main);
+      const fileInput = $('#ibFile', main);
+      drop.onclick = () => fileInput.click();
+      drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = 'var(--primary)'; };
+      drop.ondragleave = () => { drop.style.borderColor = 'var(--border)'; };
+      drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = 'var(--border)'; if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); };
+      fileInput.onchange = () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); };
+      function handleFile(file) {
+        if (!file.type.startsWith('image/')) { toast('请选择图片文件', 'error'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUri = reader.result;
+          $('#ibPreview', main).style.display = 'block';
+          $('#ibImg', main).src = dataUri;
+          $('#ibOut', main).value = dataUri;
+          $('#ibMeta', main).innerHTML = lang === 'en' ? `File: ${escapeHtml(file.name)}<br>Type: ${file.type}<br>Size: ${(file.size / 1024).toFixed(1)} KB<br>Base64 length: ${dataUri.length} chars` : `文件名：${escapeHtml(file.name)}<br>类型：${file.type}<br>大小：${(file.size / 1024).toFixed(1)} KB<br>Base64 长度：${dataUri.length} 字符`;
+          toast('转换成功', 'success');
+        };
+        reader.readAsDataURL(file);
+      }
+      $('#ibCopyData', main).onclick = () => copyText($('#ibOut', main).value);
+      $('#ibCopyRaw', main).onclick = () => {
+        const v = $('#ibOut', main).value;
+        const raw = v.replace(/^data:image\/[^;]+;base64,/, '');
+        copyText(raw);
+      };
+      $('#ibRevBtn', main).onclick = () => {
+        let v = $('#ibRev', main).value.trim();
+        if (!v) { toast('请粘贴 Base64 内容', 'error'); return; }
+        if (!v.startsWith('data:')) {
+          v = 'data:image/png;base64,' + v.replace(/\s/g, '');
+        }
+        $('#ibRevPreview', main).style.display = 'block';
+        $('#ibRevImg', main).src = v;
+        $('#ibRevImg', main).onerror = () => { toast('无法解析为图片，请检查 Base64 内容', 'error'); $('#ibRevPreview', main).style.display = 'none'; };
+        toast('预览成功', 'success');
+      };
+      $('#ibRevClear', main).onclick = () => { $('#ibRev', main).value = ''; $('#ibRevPreview', main).style.display = 'none'; };
+    }
+
+    /* ---------- 文本对比 ---------- */
+    function renderDiff(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'diff')) + `
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+              <label class="field-label">原始文本</label>
+              <textarea class="textarea" id="dfLeft" rows="10" placeholder="粘贴原始文本"></textarea>
+            </div>
+            <div>
+              <label class="field-label">修改后文本</label>
+              <textarea class="textarea" id="dfRight" rows="10" placeholder="粘贴修改后文本"></textarea>
+            </div>
+          </div>
+          <div class="btn-group" style="margin-top:12px;">
+            <button class="btn primary" id="dfCompare">⚖️ 对比差异</button>
+            <button class="btn" id="dfSwap">⇄ 交换</button>
+            <button class="btn ghost" id="dfClear">清空</button>
+          </div>
+        </div>
+        <div class="card" id="dfResultCard" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <label class="field-label">对比结果</label>
+            <div id="dfStats" style="font-size:13px;color:var(--text-mute);"></div>
+          </div>
+          <div id="dfResult" style="font-family:'SF Mono','Consolas','Courier New',monospace;font-size:13px;line-height:1.7;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;"></div>
+        </div>
+      `;
+      // LCS diff
+      function diffLines(a, b) {
+        const n = a.length, m = b.length;
+        const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+        for (let i = n - 1; i >= 0; i--)
+          for (let j = m - 1; j >= 0; j--)
+            dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        const ops = [];
+        let i = 0, j = 0;
+        while (i < n && j < m) {
+          if (a[i] === b[j]) { ops.push({ t: 'eq', v: a[i] }); i++; j++; }
+          else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push({ t: 'del', v: a[i] }); i++; }
+          else { ops.push({ t: 'add', v: b[j] }); j++; }
+        }
+        while (i < n) { ops.push({ t: 'del', v: a[i++] }); }
+        while (j < m) { ops.push({ t: 'add', v: b[j++] }); }
+        return ops;
+      }
+      $('#dfCompare', main).onclick = () => {
+        const left = $('#dfLeft', main).value.split('\n');
+        const right = $('#dfRight', main).value.split('\n');
+        const ops = diffLines(left, right);
+        let add = 0, del = 0;
+        const html = ops.map(o => {
+          const esc = escapeHtml(o.v) || '&nbsp;';
+          if (o.t === 'add') { add++; return `<div style="background:rgba(34,139,34,.12);color:#228b22;padding:1px 12px;border-left:3px solid #228b22;">+ ${esc}</div>`; }
+          if (o.t === 'del') { del++; return `<div style="background:rgba(200,0,0,.12);color:#c00;padding:1px 12px;border-left:3px solid #c00;">- ${esc}</div>`; }
+          return `<div style="color:var(--text-mute);padding:1px 12px;border-left:3px solid transparent;">&nbsp;&nbsp;${esc}</div>`;
+        }).join('');
+        $('#dfResult', main).innerHTML = html;
+        $('#dfStats', main).textContent = lang === 'en' ? `Total ${ops.length} lines - +${add} - -${del}` : `共 ${ops.length} 行 · 新增 ${add} · 删除 ${del}`;
+        $('#dfResultCard', main).style.display = 'block';
+        toast('对比完成', 'success');
+      };
+      $('#dfSwap', main).onclick = () => {
+        const l = $('#dfLeft', main).value;
+        $('#dfLeft', main).value = $('#dfRight', main).value;
+        $('#dfRight', main).value = l;
+      };
+      $('#dfClear', main).onclick = () => {
+        $('#dfLeft', main).value = ''; $('#dfRight', main).value = '';
+        $('#dfResultCard', main).style.display = 'none';
+      };
+    }
+
+    /* ---------- JSON ↔ YAML ---------- */
+    function renderYaml(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'yaml')) + `
+        <div class="card">
+          <div class="row">
+            <div class="field">
+              <label class="field-label">转换方向</label>
+              <select class="select" id="ymDir">
+                <option value="j2y">JSON → YAML</option>
+                <option value="y2j">YAML → JSON</option>
+              </select>
+            </div>
+          </div>
+          ${textareaWrap('输入', 'ymInput', '粘贴 JSON 或 YAML 文本', '{\n  "name": "DevKit",\n  "tools": ["json", "yaml"],\n  "version": 1.0\n}')}
+          <div class="btn-group">
+            <button class="btn primary" id="ymConvert">转换 →</button>
+            <button class="btn ghost" id="ymClear">清空</button>
+          </div>
+          <div class="hint" id="ymHint">依赖 js-yaml 库（CDN 加载），本地浏览器运算。</div>
+        </div>
+        <div class="card">
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="ymOutput">复制</button>
+            <textarea class="textarea lg" id="ymOutput" placeholder="转换结果将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      $('#ymConvert', main).onclick = () => {
+        const dir = $('#ymDir', main).value;
+        const input = $('#ymInput', main).value;
+        const out = $('#ymOutput', main);
+        try {
+          if (dir === 'j2y') {
+            const obj = JSON.parse(input);
+            out.value = jsyaml.dump(obj, { indent: 2, lineWidth: 120 });
+            toast('JSON → YAML 转换成功', 'success');
+          } else {
+            const obj = jsyaml.load(input);
+            out.value = JSON.stringify(obj, null, 2);
+            toast('YAML → JSON 转换成功', 'success');
+          }
+        } catch (e) {
+          out.value = '';
+          toast('转换失败：' + e.message, 'error');
+        }
+      };
+      $('#ymClear', main).onclick = () => { $('#ymInput', main).value = ''; $('#ymOutput', main).value = ''; };
+    }
+
+    /* ---------- 文本去重/排序/统计 ---------- */
+    function renderTextTool(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'texttool')) + `
+        <div class="card">
+          ${textareaWrap('输入文本（每行一条）', 'ttInput', '一行一条，按行处理', '')}
+          <div class="row" style="margin-top:12px;">
+            <div class="field">
+              <label class="field-label">去重</label>
+              <select class="select" id="ttDedup">
+                <option value="0">不去重</option>
+                <option value="1" selected>去重（保留首次）</option>
+                <option value="2">去重（保留末次）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">排序</label>
+              <select class="select" id="ttSort">
+                <option value="0">不排序</option>
+                <option value="asc">升序 (A-Z)</option>
+                <option value="desc">降序 (Z-A)</option>
+                <option value="len">按长度</option>
+                <option value="rev">反转顺序</option>
+                <option value="rand">随机打乱</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">其他</label>
+              <select class="select" id="ttOpt">
+                <option value="0">无</option>
+                <option value="trim">去首尾空格</option>
+                <option value="noblank">去空行</option>
+                <option value="trim noblank">去空格+去空行</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="ttRun">处理</button>
+            <button class="btn" id="ttCopy">复制结果</button>
+            <button class="btn ghost" id="ttClear">清空</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row" style="margin-bottom:12px;">
+            <div class="field"><label class="field-label">行数</label><div class="output-box" id="ttStatLines">-</div></div>
+            <div class="field"><label class="field-label">字符数</label><div class="output-box" id="ttStatChars">-</div></div>
+            <div class="field"><label class="field-label">字节数(UTF-8)</label><div class="output-box" id="ttStatBytes">-</div></div>
+            <div class="field"><label class="field-label">非空行</label><div class="output-box" id="ttStatNonBlank">-</div></div>
+          </div>
+          <label class="field-label">输出结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="ttOutput">复制</button>
+            <textarea class="textarea lg" id="ttOutput" placeholder="处理结果将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      $('#ttRun', main).onclick = () => {
+        let lines = $('#ttInput', main).value.split('\n');
+        const opt = $('#ttOpt', main).value;
+        if (opt.includes('trim')) lines = lines.map(l => l.trim());
+        if (opt.includes('noblank')) lines = lines.filter(l => l.trim() !== '');
+        const dedup = $('#ttDedup', main).value;
+        if (dedup === '1') { const seen = new Set(), out = []; for (const l of lines) if (!seen.has(l)) { seen.add(l); out.push(l); } lines = out; }
+        else if (dedup === '2') { const seen = new Set(), out = []; for (let i = lines.length - 1; i >= 0; i--) if (!seen.has(lines[i])) { seen.add(lines[i]); out.unshift(lines[i]); } lines = out; }
+        const sort = $('#ttSort', main).value;
+        if (sort === 'asc') lines.sort((a, b) => a.localeCompare(b, 'zh'));
+        else if (sort === 'desc') lines.sort((a, b) => b.localeCompare(a, 'zh'));
+        else if (sort === 'len') lines.sort((a, b) => a.length - b.length);
+        else if (sort === 'rev') lines.reverse();
+        else if (sort === 'rand') { for (let i = lines.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [lines[i], lines[j]] = [lines[j], lines[i]]; } }
+        const out = lines.join('\n');
+        $('#ttOutput', main).value = out;
+        $('#ttStatLines', main).textContent = lines.length;
+        $('#ttStatChars', main).textContent = out.length;
+        $('#ttStatBytes', main).textContent = new Blob([out]).size;
+        $('#ttStatNonBlank', main).textContent = lines.filter(l => l.trim() !== '').length;
+        toast('处理完成', 'success');
+      };
+      $('#ttCopy', main).onclick = () => copyText($('#ttOutput', main).value);
+      $('#ttClear', main).onclick = () => { $('#ttInput', main).value = ''; $('#ttOutput', main).value = ''; ['Lines','Chars','Bytes','NonBlank'].forEach(k => $('#ttStat' + k, main).textContent = '-'); };
+    }
+
+    /* ---------- Cron 表达式解析 ---------- */
+    function renderCron(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'cron')) + `
+        <div class="card">
+          <div class="field">
+            <label class="field-label">Cron 表达式（5 段：分 时 日 月 周）</label>
+            <input class="input mono" id="crInput" type="text" value="0 9 * * 1-5" placeholder="如 0 9 * * 1-5（工作日9点）" />
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="crParse">解析</button>
+            <button class="btn ghost" id="crClear">清空</button>
+          </div>
+          <div class="hint">支持 * / - , 和数字。示例：*/5 * * * *（每5分钟）、0 0 1 * *（每月1号）、0 9 * * 1-5（工作日9点）</div>
+        </div>
+        <div class="card" id="crCard" style="display:none;">
+          <label class="field-label">中文说明</label>
+          <div class="output-box" id="crDesc" style="margin-bottom:16px;"></div>
+          <label class="field-label">未来 5 次执行时间</label>
+          <div id="crNext" style="font-family:'SF Mono','Consolas',monospace;font-size:14px;line-height:2;"></div>
+        </div>
+      `;
+      // cron 字段配置
+      const FIELDS = [
+        { name: t('分钟'), min: 0, max: 59 },
+        { name: t('小时'), min: 0, max: 23 },
+        { name: t('日'), min: 1, max: 31 },
+        { name: t('月'), min: 1, max: 12 },
+        { name: t('星期'), min: 0, max: 6 },
+      ];
+      const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+      function parseField(expr, min, max) {
+        const vals = new Set();
+        for (const part of expr.split(',')) {
+          const p = part.trim();
+          if (p === '*') { for (let i = min; i <= max; i++) vals.add(i); }
+          else if (p.includes('/')) {
+            const [base, step] = p.split('/');
+            const s = parseInt(step);
+            let lo = min, hi = max;
+            if (base !== '*') {
+              if (base.includes('-')) { const [a, b] = base.split('-'); lo = parseInt(a); hi = parseInt(b); }
+              else lo = parseInt(base);
+            }
+            for (let i = lo; i <= hi; i += s) vals.add(i);
+          } else if (p.includes('-')) {
+            const [a, b] = p.split('-');
+            for (let i = parseInt(a); i <= parseInt(b); i++) vals.add(i);
+          } else {
+            vals.add(parseInt(p));
+          }
+        }
+        return vals;
+      }
+      function describe(vals, min, max, name) {
+        if (vals.size === max - min + 1) return (lang === 'en' ? 'Every ' + name : `每${name}`);
+        const arr = [...vals].sort((a, b) => a - b);
+        return `${name} ${arr.map(v => name === t('星期') ? (lang === 'en' ? WEEKDAYS[v] : '周' + WEEKDAYS[v]) : v).join(lang === 'en' ? ', ' : '、')}`;
+      }
+      function matchField(vals, v) { return vals.has(v); }
+      $('#crParse', main).onclick = () => {
+        const parts = $('#crInput', main).value.trim().split(/\s+/);
+        if (parts.length !== 5) { toast('需要 5 段：分 时 日 月 周', 'error'); return; }
+        let fieldSets;
+        try {
+          fieldSets = parts.map((p, i) => parseField(p, FIELDS[i].min, FIELDS[i].max));
+        } catch (e) { toast('表达式解析失败', 'error'); return; }
+        if (fieldSets.some(s => s.size === 0)) { toast('表达式无效', 'error'); return; }
+        const desc = fieldSets.map((s, i) => describe(s, FIELDS[i].min, FIELDS[i].max, FIELDS[i].name)).join('，');
+        $('#crDesc', main).textContent = desc;
+        // 计算未来 5 次
+        const next = [];
+        let d = new Date();
+        d.setSeconds(0, 0);
+        d.setMinutes(d.getMinutes() + 1);
+        const limit = new Date(Date.now() + 366 * 86400000);
+        while (next.length < 5 && d < limit) {
+          if (fieldSets[0].has(d.getMinutes()) && fieldSets[1].has(d.getHours()) &&
+              fieldSets[2].has(d.getDate()) && fieldSets[3].has(d.getMonth() + 1) &&
+              fieldSets[4].has(d.getDay())) {
+            next.push(new Date(d));
+          }
+          d.setMinutes(d.getMinutes() + 1);
+        }
+        const pad = n => String(n).padStart(2, '0');
+        $('#crNext', main).innerHTML = next.length ? next.map((t, i) =>
+          `<div>${i + 1}. ${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())} ${lang === 'en' ? WEEKDAYS[t.getDay()] : '周' + WEEKDAYS[t.getDay()]}</div>`).join('')
+          : '<div style="color:var(--text-mute);">一年内无匹配时间</div>';
+        $('#crCard', main).style.display = 'block';
+        toast('解析成功', 'success');
+      };
+      $('#crClear', main).onclick = () => { $('#crInput', main).value = ''; $('#crCard', main).style.display = 'none'; };
+    }
+
+    /* ---------- IP / 子网计算器 ---------- */
+    function renderIpCalc(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'ipcalc')) + `
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🌐 CIDR / 子网计算</h3>
+          <div class="row">
+            <div class="field" style="flex:2;">
+              <label class="field-label">IP 地址 / CIDR</label>
+              <input class="input mono" id="ipInput" type="text" value="192.168.1.100/24" placeholder="如 192.168.1.100/24" />
+            </div>
+          </div>
+          <button class="btn primary" id="ipCalc">计算</button>
+        </div>
+        <div class="card" id="ipResultCard" style="display:none;">
+          <table class="table" id="ipTable"></table>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px;">🔗 同网段判断</h3>
+          <div class="row">
+            <div class="field"><label class="field-label">IP 1 / CIDR</label><input class="input mono" id="ipA" type="text" value="192.168.1.10/24" /></div>
+            <div class="field"><label class="field-label">IP 2</label><input class="input mono" id="ipB" type="text" value="192.168.1.200" /></div>
+          </div>
+          <button class="btn primary" id="ipSameCheck">判断</button>
+          <div id="ipSameResult" style="margin-top:12px;"></div>
+        </div>
+      `;
+      function ipToInt(ip) { return ip.split('.').reduce((a, p) => (a << 8) + parseInt(p) >>> 0, 0); }
+      function intToIp(n) { return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.'); }
+      function maskFromPrefix(p) { return p === 0 ? 0 : (0xFFFFFFFF << (32 - p)) >>> 0; }
+      function maskToStr(m) { return intToIp(m); }
+      $('#ipCalc', main).onclick = () => {
+        const raw = $('#ipInput', main).value.trim();
+        const m = raw.match(/^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/);
+        if (!m) { toast('格式应为 IP/前缀，如 192.168.1.100/24', 'error'); return; }
+        const ip = m[1], prefix = parseInt(m[2]);
+        if (prefix < 0 || prefix > 32) { toast('前缀应在 0-32 之间', 'error'); return; }
+        const ipInt = ipToInt(ip), mask = maskFromPrefix(prefix);
+        const net = (ipInt & mask) >>> 0, broadcast = (net | (~mask >>> 0)) >>> 0;
+        const wildcard = (~mask >>> 0);
+        const hostCount = prefix >= 31 ? Math.pow(2, 32 - prefix) : Math.max(0, Math.pow(2, 32 - prefix) - 2);
+        const row = (k, v) => `<tr><th style="width:160px;">${k}</th><td class="mono">${v}</td><td><button class="btn sm ghost" data-copy-text="${v}">复制</button></td></tr>`;
+        $('#ipTable', main).innerHTML = `<tr><th>${t('项目')}</th><th>${t('值')}</th><th></th></tr>
+          ${row(t('IP 地址'), ip)}
+          ${row(t('CIDR 前缀'), '/' + prefix)}
+          ${row(t('子网掩码'), maskToStr(mask))}
+          ${row(t('通配符掩码'), maskToStr(wildcard))}
+          ${row(t('网络地址'), intToIp(net))}
+          ${row(t('广播地址'), intToIp(broadcast))}
+          ${row(t('可用主机范围'), prefix >= 31 ? intToIp(net) + ' ~ ' + intToIp(broadcast) : (net + 1 <= broadcast - 1 ? intToIp(net + 1) + ' ~ ' + intToIp(broadcast - 1) : '无'))}
+          ${row(t('可用主机数'), String(hostCount))}
+          ${row(t('IP 类型'), (ipInt >>> 24) === 10 ? t('A 类私有') : ((ipInt >>> 24) === 172 && ((ipInt >>> 16) & 255) >= 16 && ((ipInt >>> 16) & 255) <= 31 ? t('B 类私有') : ((ipInt >>> 24) === 192 && ((ipInt >>> 16) & 255) === 168 ? t('C 类私有') : t('公网'))))}`;
+        $('#ipResultCard', main).style.display = 'block';
+        toast('计算完成', 'success');
+      };
+      $('#ipSameCheck', main).onclick = () => {
+        const a = $('#ipA', main).value.trim().match(/^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/);
+        const bIp = $('#ipB', main).value.trim();
+        if (!a) { toast('IP1 需含 CIDR 前缀，如 192.168.1.10/24', 'error'); return; }
+        if (!/^\d+\.\d+\.\d+\.\d+$/.test(bIp)) { toast('IP2 格式错误', 'error'); return; }
+        const mask = maskFromPrefix(parseInt(a[2]));
+        const same = (ipToInt(a[1]) & mask) === (ipToInt(bIp) & mask);
+        $('#ipSameResult', main).innerHTML = same
+          ? '<span class="tag success" style="padding:8px 16px;border-radius:8px;">✅ 同网段</span>'
+          : '<span class="tag danger" style="padding:8px 16px;border-radius:8px;">❌ 不同网段</span>';
+      };
+    }
+
+    /* ---------- SQL 格式化 ---------- */
+    function renderSql(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'sql')) + `
+        <div class="card">
+          ${textareaWrap('输入 SQL', 'sqlInput', '粘贴需要格式化的 SQL 语句', 'select id, name, email from users where age > 18 and status = "active" order by name')}
+          <div class="row" style="margin-top:12px;">
+            <div class="field">
+              <label class="field-label">关键字</label>
+              <select class="select" id="sqlCase">
+                <option value="upper" selected>大写</option>
+                <option value="lower">小写</option>
+                <option value="preserve">保持原样</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">缩进</label>
+              <select class="select" id="sqlIndent">
+                <option value="2" selected>2 空格</option>
+                <option value="4">4 空格</option>
+                <option value="tab">Tab</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn primary" id="sqlFormat">格式化</button>
+            <button class="btn ghost" id="sqlClear">清空</button>
+          </div>
+          <div class="hint">基础格式化：关键字大写、主要子句换行缩进。非完整 SQL parser，复杂嵌套可能不完美。</div>
+        </div>
+        <div class="card">
+          <label class="field-label">格式化结果</label>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="sqlOutput">复制</button>
+            <textarea class="textarea lg" id="sqlOutput" placeholder="格式化后的 SQL 将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      const KEYWORDS = ['SELECT','DISTINCT','FROM','WHERE','AND','OR','NOT','IN','LIKE','BETWEEN','IS','NULL','ORDER','BY','GROUP','HAVING','LIMIT','OFFSET','JOIN','LEFT','RIGHT','INNER','OUTER','FULL','ON','UNION','INSERT','INTO','VALUES','UPDATE','SET','DELETE','CREATE','TABLE','ALTER','DROP','INDEX','PRIMARY','KEY','FOREIGN','REFERENCES','DEFAULT','CONSTRAINT','CHECK','UNIQUE','CASE','WHEN','THEN','ELSE','END','AS','ASC','DESC','COUNT','SUM','AVG','MIN','MAX'];
+      $('#sqlFormat', main).onclick = () => {
+        let sql = $('#sqlInput', main).value.trim();
+        if (!sql) { toast('请输入 SQL', 'error'); return; }
+        const cas = $('#sqlCase', main).value;
+        const indentStr = $('#sqlIndent', main).value === 'tab' ? '\t' : ' '.repeat(parseInt($('#sqlIndent', main).value));
+        // 关键字替换
+        const kwSet = new Set(KEYWORDS);
+        // 先规范化空格
+        sql = sql.replace(/\s+/g, ' ').trim();
+        // 标记关键字（按单词边界）
+        const tokens = sql.split(/(\s+|[(),;])/).filter(t => t !== '');
+        const NEWLINE_BEFORE = new Set(['FROM','WHERE','AND','OR','GROUP','ORDER','HAVING','LIMIT','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','FULL JOIN','UNION','VALUES','SET','ON']);
+        let out = '', indent = 0;
+        tokens.forEach((tok, i) => {
+          const upper = tok.toUpperCase();
+          const isKw = kwSet.has(upper);
+          const display = isKw ? (cas === 'upper' ? upper : cas === 'lower' ? upper.toLowerCase() : tok) : tok;
+          if (isKw && NEWLINE_BEFORE.has(upper) && i > 0) {
+            out += '\n' + indentStr.repeat(indent) + display + ' ';
+          } else if (tok === ',') {
+            out = out.trimEnd() + ',\n' + indentStr.repeat(indent);
+          } else if (tok === '(') {
+            out += '(';
+          } else if (tok === ')') {
+            out = out.trimEnd() + ')';
+          } else if (tok === ';') {
+            out = out.trimEnd() + ';';
+          } else {
+            out += display + ' ';
+          }
+        });
+        // 子查询缩进：SELECT 后增加缩进，遇到外层 FROM 等恢复
+        $('#sqlOutput', main).value = out.replace(/\s+$/g, '').replace(/\n /g, '\n');
+        toast('格式化完成', 'success');
+      };
+      $('#sqlClear', main).onclick = () => { $('#sqlInput', main).value = ''; $('#sqlOutput', main).value = ''; };
+    }
+
+    /* ---------- 二维码识别 ---------- */
+    function renderQrDecode(main) {
+      main.innerHTML = toolHeader(TOOLS.find(t => t.id === 'qrdecode')) + `
+        <div class="card">
+          <div id="qdDrop" style="border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;">
+            <div style="font-size:32px;">📷</div>
+            <div style="margin-top:8px;color:var(--text-mute);">点击选择或拖拽二维码图片到此处</div>
+            <div style="font-size:12px;color:var(--text-mute);margin-top:4px;">支持 PNG / JPEG / GIF / BMP</div>
+          </div>
+          <input type="file" id="qdFile" accept="image/*" style="display:none;" />
+          <div id="qdPreview" style="margin-top:16px;display:none;">
+            <img id="qdImg" style="max-width:300px;max-height:240px;border:1px solid var(--border);border-radius:8px;" />
+          </div>
+        </div>
+        <div class="card" id="qdResultCard" style="display:none;">
+          <label class="field-label">识别结果</label>
+          <div id="qdStatus" style="margin-bottom:8px;"></div>
+          <div class="textarea-wrap">
+            <button class="copy-btn" data-copy-target="qdResult">复制</button>
+            <textarea class="textarea lg" id="qdResult" placeholder="识别内容将显示在这里" readonly></textarea>
+          </div>
+        </div>
+      `;
+      const drop = $('#qdDrop', main);
+      const fileInput = $('#qdFile', main);
+      drop.onclick = () => fileInput.click();
+      drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = 'var(--primary)'; };
+      drop.ondragleave = () => { drop.style.borderColor = 'var(--border)'; };
+      drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = 'var(--border)'; if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); };
+      fileInput.onchange = () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); };
+      function handleFile(file) {
+        if (!file.type.startsWith('image/')) { toast('请选择图片文件', 'error'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            $('#qdPreview', main).style.display = 'block';
+            $('#qdImg', main).src = reader.result;
+            $('#qdResultCard', main).style.display = 'block';
+            // 用 canvas 取像素数据
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width; canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) {
+              $('#qdStatus', main).innerHTML = '<span class="tag success" style="padding:6px 12px;border-radius:6px;">✅ 识别成功</span>';
+              $('#qdResult', main).value = code.data;
+              toast('识别成功', 'success');
+            } else {
+              $('#qdStatus', main).innerHTML = '<span class="tag danger" style="padding:6px 12px;border-radius:6px;">❌ 未识别到二维码</span>';
+              $('#qdResult', main).value = '';
+              toast('未识别到二维码，请确认图片清晰', 'error');
+            }
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    /* =========================================================
+       全局事件
+       ========================================================= */
+    // 复制按钮（事件委托）
+    document.addEventListener('click', e => {
+      const copyBtn = e.target.closest('[data-copy-target]');
+      if (copyBtn) {
+        const el = $('#' + copyBtn.dataset.copyTarget);
+        if (el) copyText(el.value);
+      }
+      const copyIdBtn = e.target.closest('[data-copy]');
+      if (copyIdBtn) {
+        const el = $('#' + copyIdBtn.dataset.copy);
+        if (el) copyText(el.textContent);
+      }
+      const copyTextBtn = e.target.closest('[data-copy-text]');
+      if (copyTextBtn) {
+        copyText(copyTextBtn.dataset.copyText);
+      }
+    });
+
+    // 主题切换
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme;
+      $('#themeBtn').textContent = theme === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('devkit-theme', theme);
+    }
+    $('#themeBtn').onclick = () => {
+      const cur = document.documentElement.dataset.theme || 'light';
+      applyTheme(cur === 'light' ? 'dark' : 'light');
+    };
+    applyTheme(localStorage.getItem('devkit-theme') || 'light');
+
+    // 语言切换
+    function applyLang(l) {
+      lang = l;
+      localStorage.setItem('devkit-lang', l);
+      document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+      $('#langBtn').value = l;
+      renderSidebar();
+      buildSearchIndex();
+      translateDOM($('.header'));
+      translateDOM($('.logo-area'));
+      route();
+    }
+    $('#langBtn').onchange = () => applyLang($('#langBtn').value);
+    $('#langBtn').value = lang;
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    setTimeout(() => { translateDOM($('.header')); translateDOM($('.logo-area')); }, 0);
+
+
+    // 移动端侧栏切换
+    const sidebar = $('#sidebar');
+    const backdrop = document.createElement('div');
+    backdrop.className = 'sidebar-backdrop';
+    document.body.appendChild(backdrop);
+    function toggleSidebar() { sidebar.classList.toggle('open'); backdrop.classList.toggle('show'); }
+    function closeSidebar() { sidebar.classList.remove('open'); backdrop.classList.remove('show'); }
+    $('#menuBtn').onclick = toggleSidebar;
+    backdrop.addEventListener('click', closeSidebar);
+    // 点击导航项自动关闭
+    sidebar.addEventListener('click', e => { if (e.target.closest('.nav-item')) closeSidebar(); });
+
+    // 搜索
+    const searchInput = $('#searchInput');
+    let searchItems = []; // 缓存搜索项
+
+    function buildSearchIndex() {
+      searchItems = [];
+      $$('.nav-item').forEach(el => {
+        const text = el.textContent.trim();
+        const href = el.getAttribute('data-href') || '';
+        if (href) searchItems.push({ text, href, el });
+      });
+    }
+
+    searchInput.addEventListener('input', e => {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) {
+        $$('.nav-item').forEach(el => { el.style.display = ''; el.classList.remove('search-highlight'); });
+        return;
+      }
+      $$('.nav-item').forEach(el => {
+        const text = el.textContent.toLowerCase();
+        const match = text.includes(q);
+        el.style.display = match ? '' : 'none';
+        if (match) el.classList.add('search-highlight');
+        else el.classList.remove('search-highlight');
+      });
+    });
+
+    // 回车键跳转到第一个匹配项
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const first = $$('.nav-item').find(el => el.style.display !== 'none');
+        if (first) {
+          const href = first.getAttribute('data-href');
+          if (href) { location.hash = href; searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
+        }
+      }
+      // ESC 清空
+      if (e.key === 'Escape') { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); searchInput.blur(); }
+    });
+
+    // 路由切换
+    window.addEventListener('hashchange', () => {
+      const main = $('#main');
+      if (main._cleanup) { main._cleanup(); main._cleanup = null; }
+      route();
+    });
+
+    // 时钟（每秒更新，元素由首页渲染）
+    function updateClock() {
+      const $clock = document.getElementById('clockDisplay');
+      const $date = document.getElementById('dateDisplay');
+      const $ts = document.getElementById('timestampDisplay');
+      if (!$clock) return;
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      $clock.textContent = `${h}:${m}:${s}`;
+      if ($date) {
+        const y = now.getFullYear();
+        const mo = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+        $date.textContent = `${y}-${mo}-${d} ${weekdays[now.getDay()]}`;
+      }
+      if ($ts) $ts.textContent = Math.floor(now.getTime() / 1000);
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // 初始化
+    renderSidebar();
+    buildSearchIndex();
+    route();
+  </script>
+</body>
+</html>
