@@ -31,6 +31,12 @@ npx serve .
 
 浏览器打开 `http://localhost:8000`。
 
+运行零依赖完整性测试：
+
+```bash
+npm test
+```
+
 ## 部署到 Cloudflare Pages
 
 ### 方式一：拖拽上传（最快）
@@ -38,7 +44,7 @@ npx serve .
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/) → Workers & Pages → Create
 2. 选择 **Pages** → **Upload assets**
 3. 项目名称填 `devkit`（任意）
-4. 把 `index.html` 拖入上传区域
+4. 把项目目录中的 `index.html`、`styles.css`、`postcode-data.js` 和 `js/` 一起上传
 5. 点击 **Deploy**，几秒后即可访问 `https://devkit-xxx.pages.dev`
 
 ### 方式二：Git 仓库自动部署（推荐长期维护）
@@ -90,13 +96,41 @@ wrangler pages deploy . --project-name=devkit
 - [crypto-js](https://github.com/brix/crypto-js) - 加密哈希
 - [qrcodejs](https://github.com/davidshimjs/qrcodejs) - 二维码生成
 
+## 项目结构
+
+```text
+.
+├── index.html              # 页面骨架、依赖和脚本加载顺序
+├── styles.css              # 全局样式与响应式布局
+├── postcode-data.js        # 邮政编码数据
+├── js
+│   ├── registry.js         # 工具渲染器注册表与故障隔离
+│   ├── app.js              # 工具元数据、路由、国际化和全局事件
+│   └── tools
+│       ├── format.js       # JSON、YAML、Diff、文本、SQL
+│       ├── encoding.js     # Base64、URL、HTML、Unicode、图片
+│       ├── crypto.js       # 哈希、AES、UUID、JWT、密码
+│       ├── datetime.js     # 时间戳、世界时间、Cron
+│       ├── identity.js     # 邮编、身份证、营业执照
+│       └── misc.js         # 正则、二维码、颜色、进制、IP
+├── tests
+│   └── registry.test.mjs   # 工具元数据与注册项完整性测试
+└── package.json            # 测试命令
+```
+
 ## 扩展新工具
 
-在 `index.html` 的 `TOOLS` 数组中新增一项，并实现对应的 `renderXxx(main)` 函数即可。函数接收主容器元素，渲染完整 UI 并绑定事件。
+在 `js/app.js` 的 `TOOLS` 数组中新增工具元数据，并在对应的 `js/tools/*.js` 中实现渲染函数，再把它追加到该文件已有的 `registerTools` 对象中。函数接收主容器元素，渲染完整 UI 并绑定事件。
 
 ```js
 { id: 'my-tool', group: '其他工具', name: '我的工具', icon: '🔧',
-  desc: '工具说明', render: renderMyTool },
+  desc: '工具说明', render: resolveRenderer('my-tool') },
+
+DevKitRegistry.registerTools('misc', {
+  regex: renderRegex,
+  // ...该分组已有的其他工具
+  'my-tool': renderMyTool,
+});
 ```
 
 ## License
