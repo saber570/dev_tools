@@ -507,6 +507,16 @@ const TOOLS = [
     render: resolveRenderer('qrdecode') },
 ];
 
+/* ---------- 分组主题色系（首页卡片图标） ---------- */
+const GROUP_THEME = {
+  'JSON': 'g-json',
+  '编码解码': 'g-encode',
+  '证件工具': 'g-id',
+  '加密哈希': 'g-crypto',
+  '文本工具': 'g-text',
+  '其他工具': 'g-misc',
+};
+
 /* ---------- 路由 ---------- */
 function getHash() { return location.hash.slice(1) || 'home'; }
 function navigate(id) { location.hash = id; }
@@ -518,12 +528,13 @@ function route() {
   // 高亮导航
   $$('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.id === tool.id));
 
-  // 渲染主区
+  // 渲染主区（挂分组色系 class，供页面内组件继承 --group-accent）
   const main = $('#main');
   if (main._cleanup) {
     main._cleanup();
     main._cleanup = null;
   }
+  main.className = 'main ' + (GROUP_THEME[tool.group] || '');
   main.innerHTML = '';
   tool.render(main);
 
@@ -542,7 +553,7 @@ function renderSidebar() {
   });
   let html = '';
   Object.entries(groups).forEach(([g, list]) => {
-    html += `<div class="nav-group">
+    html += `<div class="nav-group ${GROUP_THEME[g] || ''}">
       <div class="nav-group-title">${g || '常用'}</div>`;
     list.forEach(t => {
       html += `<div class="nav-item" data-id="${t.id}" data-href="#${t.id}">
@@ -563,7 +574,7 @@ function renderSidebar() {
 function toolHeader(tool) {
   return `<div class="tool-header">
     <div>
-      <div class="tool-title">${tool.icon} ${t(tool.name)}</div>
+      <div class="tool-title"><span class="tool-badge ${GROUP_THEME[tool.group] || ''}">${tool.icon}</span>${t(tool.name)}</div>
       <div class="tool-desc">${t(tool.desc || '')}</div>
     </div>
   </div>`;
@@ -611,7 +622,7 @@ function renderHome(main) {
     </div>
     <div class="home-grid">
       ${tools.map(tool => `
-        <div class="home-card" data-go="${tool.id}">
+        <div class="home-card ${GROUP_THEME[tool.group] || ''}" data-go="${tool.id}">
           <div class="icon">${tool.icon}</div>
           <div class="title">${t(tool.name)}</div>
           <div class="desc">${t(tool.desc || '')}</div>
