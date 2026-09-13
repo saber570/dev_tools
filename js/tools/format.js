@@ -26,16 +26,17 @@ function renderJson(main) {
     </div>
   `;
   const input = $('#jsonInput', main), output = $('#jsonOutput', main);
-  const setOut = (v, err) => { output.value = v; if (err) toast(err, 'error'); };
-
-  $('#jsonFormat', main).onclick = () => {
-    try { setOut(JSON.stringify(JSON.parse(input.value), null, 2)); toast('格式化成功', 'success'); }
-    catch (e) { setOut('', true); toast('JSON 解析失败：' + e.message, 'error'); }
+  const convert = (spaces, message) => {
+    try {
+      output.value = DevKitCore.formatJson(input.value, spaces);
+      toast(message, 'success');
+    } catch (e) {
+      output.value = '';
+      toast('JSON 解析失败：' + e.message, 'error');
+    }
   };
-  $('#jsonMinify', main).onclick = () => {
-    try { setOut(JSON.stringify(JSON.parse(input.value))); toast('压缩成功', 'success'); }
-    catch (e) { setOut('', true); toast('JSON 解析失败：' + e.message, 'error'); }
-  };
+  $('#jsonFormat', main).onclick = () => convert(2, '格式化成功');
+  $('#jsonMinify', main).onclick = () => convert(0, '压缩成功');
   $('#jsonValidate', main).onclick = () => {
     try { JSON.parse(input.value); toast('✅ JSON 格式正确', 'success'); output.value = '✅ 有效的 JSON'; }
     catch (e) { toast('❌ JSON 格式错误', 'error'); output.value = '❌ ' + e.message; }
@@ -76,7 +77,7 @@ function renderDiff(main) {
         <label class="field-label">对比结果</label>
         <div id="dfStats" style="font-size:13px;color:var(--text-mute);"></div>
       </div>
-      <div id="dfResult" style="font-family:'SF Mono','Consolas','Courier New',monospace;font-size:13px;line-height:1.7;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;"></div>
+      <div id="dfResult" data-i18n-skip style="font-family:'SF Mono','Consolas','Courier New',monospace;font-size:13px;line-height:1.7;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;"></div>
     </div>
   `;
   // LCS diff
@@ -287,7 +288,6 @@ function renderSql(main) {
         <button class="btn primary" id="sqlFormat">格式化</button>
         <button class="btn ghost" id="sqlClear">清空</button>
       </div>
-      <div class="hint">基础格式化：关键字大写、主要子句换行缩进。非完整 SQL parser，复杂嵌套可能不完美。</div>
     </div>
     <div class="card">
       <label class="field-label">格式化结果</label>
@@ -297,41 +297,16 @@ function renderSql(main) {
       </div>
     </div>
   `;
-  const KEYWORDS = ['SELECT','DISTINCT','FROM','WHERE','AND','OR','NOT','IN','LIKE','BETWEEN','IS','NULL','ORDER','BY','GROUP','HAVING','LIMIT','OFFSET','JOIN','LEFT','RIGHT','INNER','OUTER','FULL','ON','UNION','INSERT','INTO','VALUES','UPDATE','SET','DELETE','CREATE','TABLE','ALTER','DROP','INDEX','PRIMARY','KEY','FOREIGN','REFERENCES','DEFAULT','CONSTRAINT','CHECK','UNIQUE','CASE','WHEN','THEN','ELSE','END','AS','ASC','DESC','COUNT','SUM','AVG','MIN','MAX'];
   $('#sqlFormat', main).onclick = () => {
-    let sql = $('#sqlInput', main).value.trim();
+    const sql = $('#sqlInput', main).value.trim();
     if (!sql) { toast('请输入 SQL', 'error'); return; }
-    const cas = $('#sqlCase', main).value;
-    const indentStr = $('#sqlIndent', main).value === 'tab' ? '\t' : ' '.repeat(parseInt($('#sqlIndent', main).value));
-    // 关键字替换
-    const kwSet = new Set(KEYWORDS);
-    // 先规范化空格
-    sql = sql.replace(/\s+/g, ' ').trim();
-    // 标记关键字（按单词边界）
-    const tokens = sql.split(/(\s+|[(),;])/).filter(t => t !== '');
-    const NEWLINE_BEFORE = new Set(['FROM','WHERE','AND','OR','GROUP','ORDER','HAVING','LIMIT','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','FULL JOIN','UNION','VALUES','SET','ON']);
-    let out = '', indent = 0;
-    tokens.forEach((tok, i) => {
-      const upper = tok.toUpperCase();
-      const isKw = kwSet.has(upper);
-      const display = isKw ? (cas === 'upper' ? upper : cas === 'lower' ? upper.toLowerCase() : tok) : tok;
-      if (isKw && NEWLINE_BEFORE.has(upper) && i > 0) {
-        out += '\n' + indentStr.repeat(indent) + display + ' ';
-      } else if (tok === ',') {
-        out = out.trimEnd() + ',\n' + indentStr.repeat(indent);
-      } else if (tok === '(') {
-        out += '(';
-      } else if (tok === ')') {
-        out = out.trimEnd() + ')';
-      } else if (tok === ';') {
-        out = out.trimEnd() + ';';
-      } else {
-        out += display + ' ';
-      }
-    });
-    // 子查询缩进：SELECT 后增加缩进，遇到外层 FROM 等恢复
-    $('#sqlOutput', main).value = out.replace(/\s+$/g, '').replace(/\n /g, '\n');
-    toast('格式化完成', 'success');
+    try {
+      $('#sqlOutput', main).value = DevKitCore.formatSql(sql, $('#sqlCase', main).value, $('#sqlIndent', main).value);
+      toast('格式化完成', 'success');
+    } catch (e) {
+      $('#sqlOutput', main).value = '';
+      toast(t('处理失败') + ': ' + e.message, 'error');
+    }
   };
   $('#sqlClear', main).onclick = () => { $('#sqlInput', main).value = ''; $('#sqlOutput', main).value = ''; };
 }

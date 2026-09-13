@@ -31,11 +31,16 @@ npx serve .
 
 浏览器打开 `http://localhost:8000`。
 
-运行零依赖完整性测试：
+使用 Node.js 20.19+ 或 22.12+，安装开发依赖并运行回归测试：
 
 ```bash
+npm ci
 npm test
 ```
+
+`js/core.js` 是已提交的本地计算库，包含 SQL 格式化、无损 JSON、Cron 和日期校验逻辑，部署时无需安装依赖或构建。修改 `src/` 或升级依赖后运行 `npm run build:core`，并一起提交生成文件。测试会检查生成文件是否与源码一致。
+
+正则工具通过独立 Worker 执行，需通过上面的 HTTP 本地预览或静态网站访问。匹配和替换均有超时保护，匹配列表最多显示 1000 项。
 
 ## 部署到 Cloudflare Pages
 
@@ -95,6 +100,8 @@ wrangler pages deploy . --project-name=devkit
 - 原生 HTML / CSS / JavaScript（无框架）
 - [crypto-js](https://github.com/brix/crypto-js) - 加密哈希
 - [qrcodejs](https://github.com/davidshimjs/qrcodejs) - 二维码生成
+- sql-formatter、lossless-json、cron-parser - 本地打包的计算依赖，版本由 `package-lock.json` 固定
+- Node.js 测试、jsdom 和 Worker 回归测试；第三方许可证见 `js/vendor-licenses.txt`
 
 ## 项目结构
 
@@ -105,6 +112,8 @@ wrangler pages deploy . --project-name=devkit
 ├── postcode-data.js        # 邮政编码数据
 ├── js
 │   ├── registry.js         # 工具渲染器注册表与故障隔离
+│   ├── core.js             # 已生成的本地计算库
+│   ├── regex-worker.js     # 隔离执行正则匹配和替换
 │   ├── app.js              # 工具元数据、路由、国际化和全局事件
 │   └── tools
 │       ├── format.js       # JSON、YAML、Diff、文本、SQL
@@ -114,7 +123,12 @@ wrangler pages deploy . --project-name=devkit
 │       ├── identity.js     # 邮编、身份证、营业执照
 │       └── misc.js         # 正则、二维码、颜色、进制、IP
 ├── tests
-│   └── registry.test.mjs   # 工具元数据与注册项完整性测试
+│   ├── registry.test.mjs   # 工具元数据与注册项完整性测试
+│   ├── core.test.mjs       # 计算结果、边界输入与跨时区验证
+│   ├── app.test.mjs        # 工具界面与语言切换回归测试
+│   └── regex.test.mjs      # 正则语义、超时、取消与数量限制
+├── src                    # 本地计算库的可维护源码
+├── scripts                # 可复现的计算库生成脚本
 └── package.json            # 测试命令
 ```
 

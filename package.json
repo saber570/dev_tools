@@ -1,6 +1,16 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test"
+    "build:core": "node scripts/build-core.mjs",
+    "test": "node scripts/build-core.mjs --check && node --test"
+  },
+  "dependencies": {
+    "cron-parser": "5.10.0",
+    "lossless-json": "4.3.1",
+    "sql-formatter": "15.8.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "jsdom": "27.4.0"
   }
 }

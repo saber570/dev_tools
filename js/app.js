@@ -159,6 +159,7 @@ const I18N = {
   '日期时间': 'Date Time',
   '请输入有效数字': 'Please enter a valid number',
   '日期格式错误': 'Invalid date format',
+  '时间戳格式或范围无效': 'Invalid timestamp format or range',
   /* World time */
   '北京': 'Beijing', '东京': 'Tokyo', '悉尼': 'Sydney',
   '迪拜': 'Dubai', '莫斯科': 'Moscow', '巴黎': 'Paris',
@@ -175,6 +176,13 @@ const I18N = {
   '正则表达式': 'Regex Pattern', '标志': 'Flags',
   '未匹配到任何内容': 'No matches found',
   '正则错误': 'Regex error',
+  '处理中...': 'Processing...',
+  '匹配数量': 'Matches', '结果已截断': 'Results truncated',
+  '正则执行超时': 'Regex execution timed out',
+  '输入内容过大': 'Input is too large',
+  '输出结果过大': 'Output is too large',
+  '替换匹配数量过多': 'Too many replacement matches',
+  '正则任务启动失败': 'Unable to start regex task',
   '替换为（用于替换模式，$1 $2 可引用分组）': 'Replace with ($1 $2 for groups)',
   /* QR Code */
   '输入文本/URL': 'Input Text/URL',
@@ -315,6 +323,7 @@ const I18N = {
   'Cron 表达式（5 段：分 时 日 月 周）': 'Cron expression (5 fields: min hour day month weekday)',
   '如 0 9 * * 1-5（工作日9点）': 'e.g. 0 9 * * 1-5 (weekdays 9am)',
   '中文说明': 'Description',
+  '执行规则': 'Schedule',
   '未来 5 次执行时间': 'Next 5 Execution Times',
   '分钟': 'Minute', '小时': 'Hour',
   '日': 'Day', '月': 'Month', '星期': 'Weekday',
@@ -370,22 +379,44 @@ const I18N = {
 };
 function t(zh) { return lang === 'zh' ? zh : (I18N[zh] || zh); }
 
+const translationState = new WeakMap();
+const englishKeys = new Map();
+Object.entries(I18N).forEach(([key, value]) => {
+  if (!englishKeys.has(value)) englishKeys.set(value, key);
+});
+function translatedValue(owner, slot, current, explicitKey) {
+  const states = translationState.get(owner) || {};
+  const previous = states[slot];
+  const text = current.trim();
+  const key = explicitKey || (previous?.rendered === current ? previous.key :
+    (Object.hasOwn(I18N, text) ? text : englishKeys.get(text)));
+  if (!key) return current;
+  const rendered = current.replace(text, t(key));
+  states[slot] = { key, rendered };
+  translationState.set(owner, states);
+  return rendered;
+}
+
 function translateDOM(root) {
-  if (!root || lang === 'zh') return;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, null);
-  const textNodes = [];
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node;
   while (node = walker.nextNode()) {
-    const trimmed = node.nodeValue.trim();
-    if (trimmed && I18N[trimmed]) textNodes.push({ node, orig: node.nodeValue, trimmed });
+    const parent = node.parentElement;
+    const key = parent?.getAttribute('data-i18n');
+    // User input and computed data must never be treated as translation keys.
+    if (!key && parent?.closest('textarea, input, pre, code, .mono, .output-box, [data-i18n-skip]')) continue;
+    const value = translatedValue(node, 'text', node.nodeValue, key);
+    if (node.nodeValue !== value) node.nodeValue = value;
   }
-  textNodes.forEach(({ node, orig, trimmed }) => {
-    node.nodeValue = orig.replace(trimmed, I18N[trimmed]);
-  });
-  root.querySelectorAll('*').forEach(el => {
+  const elements = [...root.querySelectorAll('[placeholder], [title]')];
+  if (root.nodeType === Node.ELEMENT_NODE) elements.unshift(root);
+  elements.forEach(el => {
     ['placeholder', 'title'].forEach(attr => {
-      const v = el.getAttribute(attr);
-      if (v && I18N[v]) el.setAttribute(attr, I18N[v]);
+      const current = el.getAttribute(attr);
+      if (!current) return;
+      const value = translatedValue(el, attr, current, el.getAttribute('data-i18n-' + attr));
+      if (current !== value) el.setAttribute(attr, value);
     });
   });
 }
@@ -534,6 +565,7 @@ function route() {
     main._cleanup();
     main._cleanup = null;
   }
+  main._onLangChange = null;
   main.className = 'main ' + (GROUP_THEME[tool.group] || '');
   main.innerHTML = '';
   tool.render(main);
@@ -554,11 +586,11 @@ function renderSidebar() {
   let html = '';
   Object.entries(groups).forEach(([g, list]) => {
     html += `<div class="nav-group ${GROUP_THEME[g] || ''}">
-      <div class="nav-group-title">${g || '常用'}</div>`;
+      <div class="nav-group-title" data-i18n="${g || '常用'}">${g || '常用'}</div>`;
     list.forEach(t => {
       html += `<div class="nav-item" data-id="${t.id}" data-href="#${t.id}">
         <span class="icon">${t.icon}</span>
-        <span>${t.name}</span>
+        <span data-i18n="${t.name}">${t.name}</span>
       </div>`;
     });
     html += `</div>`;
@@ -574,8 +606,8 @@ function renderSidebar() {
 function toolHeader(tool) {
   return `<div class="tool-header">
     <div>
-      <div class="tool-title"><span class="tool-badge ${GROUP_THEME[tool.group] || ''}">${tool.icon}</span>${t(tool.name)}</div>
-      <div class="tool-desc">${t(tool.desc || '')}</div>
+      <div class="tool-title"><span class="tool-badge ${GROUP_THEME[tool.group] || ''}">${tool.icon}</span><span data-i18n="${tool.name}">${t(tool.name)}</span></div>
+      <div class="tool-desc" data-i18n="${escapeHtml(tool.desc || '')}">${t(tool.desc || '')}</div>
     </div>
   </div>`;
 }
@@ -590,10 +622,10 @@ function outputBox(text, { error = false } = {}) {
 /* ---------- 通用：带复制按钮的 textarea 容器 ---------- */
 function textareaWrap(label, id, placeholder = '', value = '') {
   return `<div class="field">
-    <label class="field-label">${t(label)}</label>
+    <label class="field-label" data-i18n="${escapeHtml(label)}">${t(label)}</label>
     <div class="textarea-wrap">
       <button class="copy-btn" data-copy-target="${id}">${t('复制')}</button>
-      <textarea class="textarea" id="${id}" placeholder="${t(placeholder)}">${escapeHtml(value)}</textarea>
+      <textarea class="textarea" id="${id}" placeholder="${escapeHtml(t(placeholder))}" data-i18n-placeholder="${escapeHtml(placeholder)}">${escapeHtml(value)}</textarea>
     </div>
   </div>`;
 }
@@ -684,11 +716,11 @@ function applyLang(l) {
   localStorage.setItem('devkit-lang', l);
   document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
   $('#langBtn').value = l;
-  renderSidebar();
+  translateDOM(document.body);
+  $('#main')._onLangChange?.();
   buildSearchIndex();
-  translateDOM($('.header'));
-  translateDOM($('.logo-area'));
-  route();
+  searchInput.dispatchEvent(new Event('input'));
+  updateClock();
 }
 $('#langBtn').onchange = () => applyLang($('#langBtn').value);
 $('#langBtn').value = lang;
@@ -768,7 +800,7 @@ function updateClock() {
     const mo = String(now.getMonth() + 1).padStart(2, '0');
     const d = String(now.getDate()).padStart(2, '0');
     const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
-    $date.textContent = `${y}-${mo}-${d} ${weekdays[now.getDay()]}`;
+    $date.textContent = `${y}-${mo}-${d} ${t(weekdays[now.getDay()])}`;
   }
   if ($ts) $ts.textContent = Math.floor(now.getTime() / 1000);
 }
@@ -779,3 +811,14 @@ setInterval(updateClock, 1000);
 renderSidebar();
 buildSearchIndex();
 route();
+
+// Translate newly rendered labels without replacing controls or their live state.
+const translationObserver = new MutationObserver(records => {
+  const roots = new Set(records.map(record => record.target.nodeType === Node.TEXT_NODE
+    ? record.target.parentElement : record.target));
+  roots.forEach(root => { if (root?.isConnected) translateDOM(root); });
+});
+translationObserver.observe(document.body, {
+  subtree: true, childList: true, characterData: true,
+  attributes: true, attributeFilter: ['placeholder', 'title'],
+});

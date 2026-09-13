@@ -31,53 +31,67 @@ function renderRegex(main) {
       <div id="reResult"></div>
     </div>
   `;
-  const buildRe = () => {
-    const p = $('#rePattern', main).value;
-    const f = $('#reFlags', main).value;
-    return new RegExp(p, f);
+  let activeTask = null;
+  const setBusy = busy => {
+    $('#reTest', main).disabled = busy;
+    $('#reReplace', main).disabled = busy;
+    $('#reTest', main).textContent = t(busy ? '处理中...' : '测试匹配');
+    $('#reResult', main).setAttribute('aria-busy', String(busy));
   };
-  $('#reTest', main).onclick = () => {
+  const cancel = () => {
+    activeTask?.cancel();
+    activeTask = null;
+    setBusy(false);
+  };
+  main._cleanup = cancel;
+  const showMatches = ({ matches, truncated }) => {
+    if (!matches.length && !truncated) {
+      $('#reResult', main).innerHTML = `<div class="output-box empty"><span data-i18n="未匹配到任何内容">${t('未匹配到任何内容')}</span></div>`;
+      return;
+    }
+    let html = `<div class="hint success"><span data-i18n="匹配数量">${t('匹配数量')}</span>: ${matches.length}${truncated
+      ? ` <span data-i18n="结果已截断">${t('结果已截断')}</span>` : ''}</div>`;
+    html += `<table class="table"><tr><th>#</th><th>${t('匹配内容')}</th><th>${t('位置')}</th><th>${t('分组')}</th></tr>`;
+    matches.forEach((match, i) => {
+      html += `<tr><td>${i + 1}</td><td class="mono">${escapeHtml(match.value)}</td>
+        <td class="mono">${match.index}-${match.index + match.value.length}</td>
+        <td class="mono">${match.groups.map(value => value == null ? '-' : escapeHtml(value)).join(', ')}</td></tr>`;
+    });
+    $('#reResult', main).innerHTML = html + '</table>';
+  };
+  const run = async operation => {
+    cancel();
+    $('#reResult', main).innerHTML = '';
+    const task = DevKitCore.startRegexTask({
+      operation, pattern: $('#rePattern', main).value, flags: $('#reFlags', main).value,
+      text: $('#reText', main).value, replacement: $('#reReplaceTo', main).value,
+    });
+    activeTask = task;
+    setBusy(true);
     try {
-      const re = buildRe();
-      const text = $('#reText', main).value;
-      // matchAll 要求全局正则；展示匹配列表时用副本补上 g，
-      // 不改变用户为替换操作填写的原始 flags。
-      const matchRe = re.global ? re : new RegExp(re.source, re.flags + 'g');
-      const matches = [...text.matchAll(matchRe)];
-      if (!matches.length) {
-        $('#reResult', main).innerHTML = `<div class="output-box empty">${t('未匹配到任何内容')}</div>`;
-        return;
+      const result = await task.promise;
+      if (activeTask !== task) return;
+      if (operation === 'match') showMatches(result);
+      else {
+        $('#reResult', main).innerHTML = `<label class="field-label">${t('替换结果')}</label>
+          <div class="textarea-wrap"><button class="copy-btn" data-copy-target="reReplaceOut">${t('复制')}</button>
+          <textarea class="textarea" id="reReplaceOut">${escapeHtml(result.text)}</textarea></div>`;
+        toast('替换完成', 'success');
       }
-      let html = `<div class="hint success">共匹配 ${matches.length} 处</div>`;
-      html += `<table class="table"><tr><th>#</th><th>${t('匹配内容')}</th><th>${t('位置')}</th><th>${t('分组')}</th></tr>`;
-      matches.forEach((m, i) => {
-        html += `<tr>
-          <td>${i + 1}</td>
-          <td class="mono">${escapeHtml(m[0])}</td>
-          <td class="mono">${m.index}-${m.index + m[0].length}</td>
-          <td class="mono">${m.slice(1).map(x => x == null ? '-' : escapeHtml(x)).join(', ')}</td>
-        </tr>`;
-      });
-      html += `</table>`;
-      $('#reResult', main).innerHTML = html;
-      toast(`匹配到 ${matches.length} 处`, 'success');
-    } catch (e) { toast('正则错误：' + e.message, 'error'); }
+    } catch (error) {
+      if (error.name === 'AbortError' || activeTask !== task) return;
+      const messages = {
+        TIMEOUT: '正则执行超时', WORKER: '正则任务启动失败', INPUT_LIMIT: '输入内容过大',
+        OUTPUT_LIMIT: '输出结果过大', REPLACE_LIMIT: '替换匹配数量过多',
+      };
+      toast(messages[error.code] || t('正则错误') + ': ' + error.message, 'error');
+    } finally {
+      if (activeTask === task) { activeTask = null; setBusy(false); }
+    }
   };
-  $('#reReplace', main).onclick = () => {
-    try {
-      const re = buildRe();
-      const text = $('#reText', main).value;
-      const to = $('#reReplaceTo', main).value;
-      const r = text.replace(re, to);
-      $('#reResult', main).innerHTML = `<label class="field-label">替换结果</label>
-        <div class="textarea-wrap">
-          <button class="copy-btn" data-copy-target="reReplaceOut">复制</button>
-          <textarea class="textarea" id="reReplaceOut">${escapeHtml(r)}</textarea>
-        </div>`;
-      toast('替换完成', 'success');
-    } catch (e) { toast('正则错误：' + e.message, 'error'); }
-  };
-  $('#reClear', main).onclick = () => { $('#reText', main).value = ''; $('#reResult', main).innerHTML = ''; };
+  $('#reTest', main).onclick = () => run('match');
+  $('#reReplace', main).onclick = () => run('replace');
+  $('#reClear', main).onclick = () => { cancel(); $('#reText', main).value = ''; $('#reResult', main).innerHTML = ''; };
 }
 
 /* ---------- 二维码 ---------- */

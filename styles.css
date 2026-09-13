@@ -274,6 +274,7 @@ a { color: var(--primary); text-decoration: none; }
 }
 .btn:hover { background: var(--bg-hover); }
 .btn:active { transform: scale(0.96); }
+.btn:disabled { cursor: wait; opacity: 0.6; transform: none; }
 .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn.primary:hover { background: var(--primary-hover); box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent); }
 .btn.primary:active { box-shadow: none; }

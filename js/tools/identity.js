@@ -326,11 +326,7 @@ function renderIdCard(main) {
     const province = PROVINCES[provinceCode] || (lang === 'en' ? 'Unknown' : '未知地区');
     const birthStr = id.slice(6, 14);
     const year = birthStr.slice(0, 4), month = birthStr.slice(4, 6), day = birthStr.slice(6, 8);
-    const birthDate = new Date(`${year}-${month}-${day}`);
-    const isDateValid = birthDate instanceof Date && !isNaN(birthDate)
-      && birthDate.getFullYear() === parseInt(year)
-      && (birthDate.getMonth() + 1) === parseInt(month)
-      && birthDate.getDate() === parseInt(day);
+    const isDateValid = DevKitCore.isValidCalendarDate(Number(year), Number(month), Number(day));
     if (!isDateValid) {
       fail('出生日期无效');
       toast('出生日期无效', 'error');
@@ -439,10 +435,10 @@ function renderLicense(main) {
   const USC_WEIGHTS = [1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28];
 
   const DEPT_MAP = {
-    '1': t('机构编制'), '5': t('民政'), '9': t('工商'), 'Y': t('其他')
+    '1': '机构编制', '5': '民政', '9': '工商', 'Y': '其他'
   };
   const ORG_TYPE_BY_DEPT = {
-    '9': { '1': t('企业'), '2': t('个体工商户'), '3': t('农民专业合作社') },
+    '9': { '1': '企业', '2': '个体工商户', '3': '农民专业合作社' },
     '1': { '1': '机关', '2': '事业单位', '3': '中央编办直接管理机构编制的群众团体', '9': '其他' },
     '5': { '1': '社会团体', '2': '民办非企业单位', '3': '基金会', '4': '宗教活动场所', '9': '其他' },
     'Y': { '9': '其他' }
@@ -592,8 +588,8 @@ function renderLicense(main) {
       const adminDiv = code.slice(2, 8);
       const subjectCode = code.slice(8, 17);
       const province = PROVINCES[adminDiv.slice(0, 2)] || (lang === 'en' ? 'Unknown' : '未知地区');
-      const dept = DEPT_MAP[deptCode] || (lang === 'en' ? 'Unknown' : '未知');
-      const orgType = (ORG_TYPE_BY_DEPT[deptCode] && ORG_TYPE_BY_DEPT[deptCode][orgTypeCode]) || (lang === 'en' ? 'Unknown' : '未知');
+      const dept = t(DEPT_MAP[deptCode] || (lang === 'en' ? 'Unknown' : '未知'));
+      const orgType = t((ORG_TYPE_BY_DEPT[deptCode] && ORG_TYPE_BY_DEPT[deptCode][orgTypeCode]) || (lang === 'en' ? 'Unknown' : '未知'));
 
       tag.innerHTML = lang === 'en' ? '<span class="tag success">Validation Passed</span>' : '<span class="tag success">校验通过</span>';
       txt.style.color = 'var(--success)';

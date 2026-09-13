@@ -68,10 +68,13 @@ function renderTimestamp(main) {
   const timer = setInterval(refresh, 1000);
 
   $('#ts2dBtn', main).onclick = () => {
-    let v = parseInt($('#ts2dInput', main).value.trim());
-    if (isNaN(v)) { toast('请输入有效数字', 'error'); return; }
-    if ($('#ts2dUnit', main).value === 's') v *= 1000;
-    const d = new Date(v);
+    let d;
+    try { d = DevKitCore.parseTimestamp($('#ts2dInput', main).value, $('#ts2dUnit', main).value); }
+    catch (e) {
+      $('#ts2dResult', main).innerHTML = '';
+      toast('时间戳格式或范围无效', 'error');
+      return;
+    }
     $('#ts2dResult', main).innerHTML = `
       <table class="table">
         <tr><th>${t('本地时间')}</th><th>${t('UTC 时间')}</th><th>ISO 8601</th></tr>
@@ -83,9 +86,13 @@ function renderTimestamp(main) {
       </table>`;
   };
   $('#d2tsBtn', main).onclick = () => {
-    const s = $('#d2tsInput', main).value.trim();
-    const d = new Date(s.replace(/-/g, '/'));
-    if (isNaN(d.getTime())) { toast('日期格式错误', 'error'); return; }
+    let d;
+    try { d = DevKitCore.parseLocalDateTime($('#d2tsInput', main).value); }
+    catch (e) {
+      $('#d2tsResult', main).innerHTML = '';
+      toast('日期格式错误', 'error');
+      return;
+    }
     $('#d2tsResult', main).innerHTML = `
       <table class="table">
         <tr><th>${t('秒级时间戳')}</th><th>${t('毫秒级时间戳')}</th></tr>
@@ -219,104 +226,50 @@ function renderCron(main) {
       <div class="hint">支持 * / - , 和数字。示例：*/5 * * * *（每5分钟）、0 0 1 * *（每月1号）、0 9 * * 1-5（工作日9点）</div>
     </div>
     <div class="card" id="crCard" style="display:none;">
-      <label class="field-label">中文说明</label>
+      <label class="field-label">执行规则</label>
       <div class="output-box" id="crDesc" style="margin-bottom:16px;"></div>
       <label class="field-label">未来 5 次执行时间</label>
       <div id="crNext" style="font-family:'SF Mono','Consolas',monospace;font-size:14px;line-height:2;"></div>
     </div>
   `;
-  // cron 字段配置
   const FIELDS = [
-    { name: t('分钟'), min: 0, max: 59 },
-    { name: t('小时'), min: 0, max: 23 },
-    { name: t('日'), min: 1, max: 31 },
-    { name: t('月'), min: 1, max: 12 },
-    { name: t('星期'), min: 0, max: 6 },
+    { name: '分钟', min: 0, max: 59 },
+    { name: '小时', min: 0, max: 23 },
+    { name: '日', min: 1, max: 31 },
+    { name: '月', min: 1, max: 12 },
+    { name: '星期', min: 0, max: 6 },
   ];
-  const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
-  function parseField(expr, min, max) {
-    const vals = new Set();
-    const parseValue = value => {
-      if (!/^\d+$/.test(value)) throw new Error('invalid number');
-      const n = Number(value);
-      if (!Number.isInteger(n) || n < min || n > max) throw new Error('out of range');
-      return n;
-    };
-    const parseRange = value => {
-      const pieces = value.split('-');
-      if (pieces.length === 1) {
-        const n = parseValue(pieces[0]);
-        return [n, n];
-      }
-      if (pieces.length !== 2) throw new Error('invalid range');
-      const lo = parseValue(pieces[0]);
-      const hi = parseValue(pieces[1]);
-      if (lo > hi) throw new Error('reversed range');
-      return [lo, hi];
-    };
-    for (const part of expr.split(',')) {
-      const p = part.trim();
-      if (!p) throw new Error('empty field');
-      if (p === '*') { for (let i = min; i <= max; i++) vals.add(i); }
-      else if (p.includes('/')) {
-        const pieces = p.split('/');
-        if (pieces.length !== 2 || !/^\d+$/.test(pieces[1])) throw new Error('invalid step');
-        const [base, step] = pieces;
-        const s = Number(step);
-        if (!Number.isInteger(s) || s <= 0 || s > max - min + 1) throw new Error('invalid step');
-        let lo = min, hi = max;
-        if (base !== '*') {
-          if (base.includes('-')) [lo, hi] = parseRange(base);
-          else lo = parseValue(base);
-        }
-        for (let i = lo; i <= hi; i += s) vals.add(i);
-      } else if (p.includes('-')) {
-        const [lo, hi] = parseRange(p);
-        for (let i = lo; i <= hi; i++) vals.add(i);
-      } else {
-        vals.add(parseValue(p));
-      }
-    }
-    return vals;
+  const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  let schedule = null;
+  function showSchedule() {
+    if (!schedule) return;
+    const descriptions = schedule.fields.map((values, i) => {
+      const field = FIELDS[i];
+      if (values.length === field.max - field.min + 1) return lang === 'en' ? 'Every ' + t(field.name) : '每' + field.name;
+      return t(field.name) + ' ' + values.map(v => i === 4 ? t(WEEKDAYS[v]) : v).join(lang === 'en' ? ', ' : '、');
+    });
+    const dayRule = schedule.dayOr
+      ? `(${descriptions[2]} ${lang === 'en' ? 'or' : '或'} ${descriptions[4]})`
+      : `${descriptions[2]}, ${descriptions[4]}`;
+    $('#crDesc', main).textContent = [descriptions[0], descriptions[1], descriptions[3], dayRule].join(lang === 'en' ? '; ' : '；');
+    const pad = n => String(n).padStart(2, '0');
+    $('#crNext', main).innerHTML = schedule.next.map((date, i) =>
+      `<div>${i + 1}. ${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())} ${t(WEEKDAYS[date.getDay()])}</div>`).join('');
   }
-  function describe(vals, min, max, name) {
-    if (vals.size === max - min + 1) return (lang === 'en' ? 'Every ' + name : `每${name}`);
-    const arr = [...vals].sort((a, b) => a - b);
-    return `${name} ${arr.map(v => name === t('星期') ? (lang === 'en' ? WEEKDAYS[v] : '周' + WEEKDAYS[v]) : v).join(lang === 'en' ? ', ' : '、')}`;
-  }
-  function matchField(vals, v) { return vals.has(v); }
+  main._onLangChange = showSchedule;
   $('#crParse', main).onclick = () => {
     const parts = $('#crInput', main).value.trim().split(/\s+/);
+    schedule = null;
+    $('#crCard', main).style.display = 'none';
     if (parts.length !== 5) { toast('需要 5 段：分 时 日 月 周', 'error'); return; }
-    let fieldSets;
     try {
-      fieldSets = parts.map((p, i) => parseField(p, FIELDS[i].min, FIELDS[i].max));
+      schedule = DevKitCore.getCronSchedule(parts.join(' '));
     } catch (e) { toast('表达式解析失败', 'error'); return; }
-    if (fieldSets.some(s => s.size === 0)) { toast('表达式无效', 'error'); return; }
-    const desc = fieldSets.map((s, i) => describe(s, FIELDS[i].min, FIELDS[i].max, FIELDS[i].name)).join('，');
-    $('#crDesc', main).textContent = desc;
-    // 计算未来 5 次
-    const next = [];
-    let d = new Date();
-    d.setSeconds(0, 0);
-    d.setMinutes(d.getMinutes() + 1);
-    const limit = new Date(Date.now() + 366 * 86400000);
-    while (next.length < 5 && d < limit) {
-      if (fieldSets[0].has(d.getMinutes()) && fieldSets[1].has(d.getHours()) &&
-          fieldSets[2].has(d.getDate()) && fieldSets[3].has(d.getMonth() + 1) &&
-          fieldSets[4].has(d.getDay())) {
-        next.push(new Date(d));
-      }
-      d.setMinutes(d.getMinutes() + 1);
-    }
-    const pad = n => String(n).padStart(2, '0');
-    $('#crNext', main).innerHTML = next.length ? next.map((t, i) =>
-      `<div>${i + 1}. ${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())} ${lang === 'en' ? WEEKDAYS[t.getDay()] : '周' + WEEKDAYS[t.getDay()]}</div>`).join('')
-      : '<div style="color:var(--text-mute);">一年内无匹配时间</div>';
+    showSchedule();
     $('#crCard', main).style.display = 'block';
     toast('解析成功', 'success');
   };
-  $('#crClear', main).onclick = () => { $('#crInput', main).value = ''; $('#crCard', main).style.display = 'none'; };
+  $('#crClear', main).onclick = () => { schedule = null; $('#crInput', main).value = ''; $('#crCard', main).style.display = 'none'; };
 }
 
 DevKitRegistry.registerTools('datetime', {
